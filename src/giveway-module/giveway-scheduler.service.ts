@@ -13,6 +13,13 @@ export class GivewayScheduler {
       return;
     }
 
+    for (let index = 0; index < giveaways.length; index++) {
+      const giveaway = giveaways[index];
+      const winners = this.giveawayService.determineWinners(giveaway);
+      giveaway.winners = winners;
+      await giveaway.save();
+    }
+
     console.log(`Found: ${giveaways.length} giveaways ready for distribution`);
   }
 }

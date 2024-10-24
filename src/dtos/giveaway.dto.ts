@@ -17,7 +17,7 @@ export class GiveawayDto {
 
   @IsNotEmpty()
   @IsNumberString()
-  winners: string;
+  winnerCount: string;
 
   @IsNotEmpty()
   @IsString()

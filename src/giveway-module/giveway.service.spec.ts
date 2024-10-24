@@ -175,7 +175,7 @@ describe('GiveawayService', () => {
   });
 
   it('should distribute tokens across multiple users with controlled randomness and high tokenQuantity', () => {
-    const extremelyLargeNumber = new BigNumber('1e100'); // Extremely large number, beyond JS Number
+    const extremelyLargeNumber = new BigNumber('1e100').plus(new BigNumber(2)); // Extremely large number, beyond JS Number, plus one to ensure edge case is handled
 
     const giveaway: any = {
       endDateTime: new Date(),
@@ -185,7 +185,7 @@ describe('GiveawayService', () => {
         category: 'testCategory',
         additionalKey: 'testKey',
       },
-      tokenQuantity: extremelyLargeNumber.toString(), // High tokenQuantity to trigger batch processing and issues if bignumber is not used
+      tokenQuantity: extremelyLargeNumber.toString(),
       winners: [],
       usersSignedUp: ['user1', 'user2', 'user3', 'user4'],
       distributed: false,
@@ -206,16 +206,17 @@ describe('GiveawayService', () => {
 
     // Ensure that the winners were selected as per the mock random values
     const expectedWinCounts = {
-      user1: '2.5e+99',
+      user1: new BigNumber('2.5e+99').plus(new BigNumber(2)).toString(),
       user2: '2.5e+99',
       user3: '2.5e+99',
       user4: '2.5e+99',
     };
 
+    expect(winners.length).toBe(4);
+
     winners.forEach((winner) => {
       expect(winner.winCount).toBe(expectedWinCounts[winner.userId]);
     });
-    expect(winners.length).toBe(4);
 
     const totalDistributedTokens = winners.reduce(
       (sum, winner) => sum.plus(new BigNumber(winner.winCount)),
@@ -225,6 +226,68 @@ describe('GiveawayService', () => {
       totalDistributedTokens.isEqualTo(new BigNumber(giveaway.tokenQuantity)),
     ).toBe(true);
 
+    jest.restoreAllMocks();
+  });
+
+  it('should distribute tokens across a single user with controlled randomness and high tokenQuantity', () => {
+    const extremelyLargeNumber = new BigNumber('1e100').plus(new BigNumber(2)); // Extremely large number, beyond JS Number, plus one to ensure edge case is handled
+
+    const giveaway: any = {
+      endDateTime: new Date(),
+      giveawayToken: {
+        collection: 'testCollection',
+        type: 'testType',
+        category: 'testCategory',
+        additionalKey: 'testKey',
+      },
+      tokenQuantity: extremelyLargeNumber.toString(),
+      winners: [],
+      winnerCount: 1,
+      usersSignedUp: ['user1', 'user2', 'user3', 'user4'],
+      distributed: false,
+      creator: new Types.ObjectId(),
+    };
+
+    let callIndex = 0;
+    const usersCount = giveaway.usersSignedUp.length;
+    jest.spyOn(global.Math, 'random').mockImplementation(() => {
+      // Cycle through indices 0 to usersCount - 1
+      const index = callIndex % usersCount;
+      callIndex++;
+      const randomValue = index / usersCount;
+      return randomValue;
+    });
+
+    let winners = giveawayService.determineWinners(giveaway);
+
+    // Ensure that the winners were selected as per the mock random values
+    let expectedWinCounts: any = {
+      user1: extremelyLargeNumber,
+    };
+
+    winners.forEach((winner) => {
+      expect(winner.winCount).toBe(expectedWinCounts[winner.userId].toString());
+    });
+    expect(winners.length).toBe(1);
+
+    const totalDistributedTokens = winners.reduce(
+      (sum, winner) => sum.plus(new BigNumber(winner.winCount)),
+      new BigNumber(0),
+    );
+    expect(
+      totalDistributedTokens.isEqualTo(new BigNumber(giveaway.tokenQuantity)),
+    ).toBe(true);
+
+    winners = giveawayService.determineWinners(giveaway);
+
+    //Checking to make sure rng is being taken in to account
+    expectedWinCounts = {
+      user2: extremelyLargeNumber,
+    };
+
+    winners.forEach((winner) => {
+      expect(winner.winCount).toBe(expectedWinCounts[winner.userId].toString());
+    });
     jest.restoreAllMocks();
   });
 });

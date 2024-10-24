@@ -12,6 +12,7 @@ export interface GiveawayDocument extends Document {
   giveawayToken: TokenClassBody;
   tokenQuantity: string;
   winners: Winner[];
+  winnerCount?: number;
   usersSignedUp: string[];
   distributed: boolean;
   creator: Types.ObjectId;
@@ -36,6 +37,7 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
   tokenQuantity: { type: String, required: true },
 
   winners: { type: [WinnerSchema], default: [] },
+  winnerCount: { type: Number, required: false },
   usersSignedUp: { type: [String], default: [] },
   distributed: { type: Boolean, default: false },
 

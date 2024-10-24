@@ -5,6 +5,8 @@ import { GiveawayDocument, Winner } from '../schemas/giveaway.schema';
 import { signatures } from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
 import BigNumber from 'bignumber.js';
+import { GiveawayDto } from '../dtos/giveaway.dto';
+import { MAX_ITERATIONS } from '../constant';
 
 @Injectable()
 export class GiveawayService {
@@ -16,7 +18,7 @@ export class GiveawayService {
 
   async createGiveaway(
     publicKey: string,
-    giveawayDto: any,
+    giveawayDto: GiveawayDto,
   ): Promise<GiveawayDocument> {
     const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
 
@@ -26,7 +28,7 @@ export class GiveawayService {
       endDateTime: new Date(giveawayDto.endDateTime),
       giveawayToken: giveawayDto.giveawayToken,
       tokenQuantity: giveawayDto.tokenQuantity,
-      winners: giveawayDto.winners,
+      winnerCount: giveawayDto.winnerCount,
       creator: account.id,
     });
     return await newGiveaway.save();
@@ -46,62 +48,44 @@ export class GiveawayService {
       .exec();
   }
 
-  determineWinners(
-    giveaway: GiveawayDocument,
-    maxIterations = 100000,
-  ): Winner[] {
-    const numWinners = new BigNumber(giveaway.tokenQuantity);
+  determineWinners(giveaway: GiveawayDocument): Winner[] {
     const usersSignedUp = giveaway.usersSignedUp;
     const numberOfUsers = usersSignedUp.length;
     const winnersMap: { [userId: string]: BigNumber } = {};
+    const iterations = Math.min(
+      MAX_ITERATIONS,
+      giveaway.winnerCount || MAX_ITERATIONS,
+    );
 
     if (usersSignedUp.length === 0) {
       throw new Error('No users signed up for the giveaway.');
     }
 
-    let remainingTokens = numWinners;
+    let remainingTokens = new BigNumber(giveaway.tokenQuantity);
 
-    // Calculate the minimum number of tokens each user can win per batch to stay under maxIterations
-    const minWinPerIteration = numWinners
-      .dividedBy(maxIterations)
-      .integerValue(BigNumber.ROUND_FLOOR);
-
-    while (remainingTokens.gt(0)) {
-      // Current batch size is the smaller of the remaining tokens or maxIterations
-      const currentBatchSize = BigNumber.min(remainingTokens, maxIterations);
-      let totalDistributedInBatch = new BigNumber(0);
-
-      // Distribute minimum tokens to users in the current batch
-      usersSignedUp.forEach((userId) => {
-        if (remainingTokens.gt(0)) {
-          const tokensToDistribute = BigNumber.min(
-            remainingTokens,
-            minWinPerIteration,
-          );
-          remainingTokens = remainingTokens.minus(tokensToDistribute);
-
-          if (!winnersMap[userId]) {
-            winnersMap[userId] = new BigNumber(0);
-          }
-          winnersMap[userId] = winnersMap[userId].plus(tokensToDistribute);
-          totalDistributedInBatch =
-            totalDistributedInBatch.plus(tokensToDistribute);
-        }
-      });
-
-      // Handle any remaining tokens (less than minWinPerIteration) after the batch
-      let remainingInBatch = currentBatchSize.minus(totalDistributedInBatch);
-      let userIndex = 0;
-
-      while (remainingInBatch.gt(0)) {
-        const userId = usersSignedUp[userIndex % numberOfUsers];
-        winnersMap[userId] = winnersMap[userId].plus(1);
-        remainingInBatch = remainingInBatch.minus(1);
-        remainingTokens = remainingTokens.minus(1);
-        userIndex++;
-      }
+    let minWinPerIteration = new BigNumber(1);
+    if (remainingTokens.gt(iterations)) {
+      minWinPerIteration = remainingTokens
+        .dividedBy(iterations)
+        .integerValue(BigNumber.ROUND_FLOOR); // Round down to ensure we don't exceed the number of tokens
     }
 
+    while (remainingTokens.gt(0)) {
+      // Distribute minimum tokens to users
+      const randomIndex = Math.floor(Math.random() * numberOfUsers);
+      const winnerId = usersSignedUp[randomIndex];
+
+      const tokensToDistribute = BigNumber.min(
+        remainingTokens,
+        minWinPerIteration,
+      );
+      remainingTokens = remainingTokens.minus(tokensToDistribute);
+
+      if (!winnersMap[winnerId]) {
+        winnersMap[winnerId] = new BigNumber(0);
+      }
+      winnersMap[winnerId] = winnersMap[winnerId].plus(tokensToDistribute);
+    }
     // Convert the winnersMap to an array of Winner objects
     const winnersArray: Winner[] = Object.entries(winnersMap).map(
       ([userId, winCount]) => ({
