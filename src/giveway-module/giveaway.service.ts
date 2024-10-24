@@ -6,7 +6,7 @@ import { signatures } from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
 import BigNumber from 'bignumber.js';
 import { GiveawayDto } from '../dtos/giveaway.dto';
-import { MAX_ITERATIONS } from '../constant';
+import { MAX_ITERATIONS as MAX_WINNERS } from '../constant';
 
 @Injectable()
 export class GiveawayService {
@@ -53,8 +53,8 @@ export class GiveawayService {
     const numberOfUsers = usersSignedUp.length;
     const winnersMap: { [userId: string]: BigNumber } = {};
     const iterations = Math.min(
-      MAX_ITERATIONS,
-      giveaway.winnerCount || MAX_ITERATIONS,
+      MAX_WINNERS,
+      giveaway.winnerCount || MAX_WINNERS,
     );
 
     if (usersSignedUp.length === 0) {

@@ -1,5 +1,6 @@
 import { TokenClassBody } from '@gala-chain/api';
 import { Types, Schema, Document } from 'mongoose';
+import { MAX_ITERATIONS } from '../constant';
 
 export interface Winner {
   userId: string;
@@ -37,7 +38,15 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
   tokenQuantity: { type: String, required: true },
 
   winners: { type: [WinnerSchema], default: [] },
-  winnerCount: { type: Number, required: false },
+  winnerCount: {
+    type: Number,
+    required: false,
+    max: MAX_ITERATIONS,
+    validate: {
+      validator: Number.isInteger,
+      message: '{VALUE} is not an integer value',
+    },
+  },
   usersSignedUp: { type: [String], default: [] },
   distributed: { type: Boolean, default: false },
 
