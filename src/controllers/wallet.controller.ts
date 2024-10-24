@@ -1,20 +1,26 @@
-import { Controller, Get, Res, HttpStatus, Post, Body } from '@nestjs/common';
-import { BabyOpsApi } from '../services/token.service';
-import { SecretConfigService } from '../services/secrets.service';
+import {
+  Controller,
+  Get,
+  Res,
+  HttpStatus,
+  Post,
+  Body,
+  Param,
+  BadRequestException,
+} from '@nestjs/common';
+import { BabyOpsApi } from '../services/baby-ops.service';
+import { SecretConfigService } from '../secrets/secrets.service';
 import { Response } from 'express';
-import { GrantAllowanceParams } from '@gala-chain/api';
+import { TokenClassBody } from '@gala-chain/api';
+import { ProfileService } from '../services/profile.service';
 
-@Controller('api')
+@Controller('api/wallet')
 export class WalletController {
   constructor(
     private tokenService: BabyOpsApi,
     private secretsService: SecretConfigService,
+    private profileService: ProfileService,
   ) {}
-
-  @Get('adminWallet')
-  async getAdminWalletAddress() {
-    return this.tokenService.getAdminWalletInfo();
-  }
 
   @Get('generateWallet')
   async generateWallet(@Res() res: Response) {
@@ -33,34 +39,47 @@ export class WalletController {
     }
   }
 
-  @Get('admin-balances')
-  async getAdminBalances(@Res() res: Response) {
+  @Get('giveaway-wallet-balances/:gcAddress')
+  async getAdminBalances(@Param('gcAddress') gcAddress: string) {
     try {
-      const walletAddress = this.tokenService.client.walletAddress.replace(
-        '0x',
-        'eth|',
+      const userInfo = await this.profileService.findProfileByGC(gcAddress);
+      const balances = await this.tokenService.fetchBalances(
+        userInfo.giveawayWalletAddress,
       );
-      const balances = await this.tokenService.fetchBalances(walletAddress);
-      res.status(HttpStatus.OK).json(balances);
+      return balances;
     } catch (error) {
       console.error(error);
-      res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ error: 'Failed to fetch balances' });
+      throw new BadRequestException(
+        `Failed to fetch balances, error: ${error}`,
+      );
     }
   }
 
-  @Post('grant-allowance')
-  async grantAllowance(
-    @Body() allowanceParams: GrantAllowanceParams,
-    @Res() res: Response,
-  ) {
+  @Get('admin-allowance/:gcAddress')
+  async getAdminAllowances(@Param('gcAddress') gcAddress: string) {
     try {
-      return this.tokenService.grantAllowance(allowanceParams);
+      const userInfo = await this.profileService.findProfileByGC(gcAddress);
+
+      const balances = await this.tokenService.fetchAllowances(
+        userInfo.giveawayWalletAddress,
+      );
+      return balances;
     } catch (error) {
-      res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ success: false, message: 'Failed to grant allowance', error });
+      console.error(error);
+      throw new BadRequestException('Failed to fetch balances');
     }
+  }
+
+  @Post('allowance-available/:gcAddress')
+  async getAllowanceAvailable(
+    @Param('gcAddress') gcAddress: string,
+    @Body() tokenClass: TokenClassBody,
+  ) {
+    const userInfo = await this.profileService.findProfileByGC(gcAddress);
+    return this.tokenService.getTotalAllowanceQuantity(
+      userInfo.giveawayWalletAddress,
+      userInfo.id,
+      tokenClass,
+    );
   }
 }

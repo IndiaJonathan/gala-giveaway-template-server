@@ -1,4 +1,4 @@
-// src/dto/giveaway.dto.ts
+import { TokenClassBody } from '@gala-chain/api';
 import {
   IsNotEmpty,
   IsString,
@@ -9,12 +9,15 @@ import {
 
 export class GiveawayDto {
   @IsNotEmpty()
-  @IsString()
-  giveawayToken: string;
+  giveawayToken: TokenClassBody;
 
   @IsNotEmpty()
   @IsNumberString()
-  amount: string;
+  tokenQuantity: string;
+
+  @IsNotEmpty()
+  @IsNumberString()
+  winners: string;
 
   @IsNotEmpty()
   @IsString()
@@ -25,5 +28,5 @@ export class GiveawayDto {
   @Validate((value: string) => !isNaN(Date.parse(value)), {
     message: 'endTime must be a valid ISO 8601 date string',
   })
-  endTime?: string;
+  endDateTime?: string;
 }

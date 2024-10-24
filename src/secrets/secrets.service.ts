@@ -1,16 +1,10 @@
 import { SecretsManager } from '@aws-sdk/client-secrets-manager';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import fs from 'fs';
-
-const logger = new Logger('SecretConfigService');
 
 @Injectable()
 export class SecretConfigService {
   async getSecret(key?: string) {
-    if (!process.env.AWS_SECRETS_ID) {
-      logger.warn('AWS_SECRETS_ID not set, defaulting to local/gala-giveway');
-    }
-
     const secretsId = process.env.AWS_SECRETS_ID ?? 'local/gala-giveaway';
 
     // required for secrets manager, so if present prefer using it

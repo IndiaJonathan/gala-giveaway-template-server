@@ -1,6 +1,6 @@
 import { MongoClient, Db } from 'mongodb';
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { SecretConfigService } from './secrets.service';
+import { SecretConfigService } from '../secrets/secrets.service';
 
 @Injectable()
 export class DatabaseService implements OnModuleInit {
