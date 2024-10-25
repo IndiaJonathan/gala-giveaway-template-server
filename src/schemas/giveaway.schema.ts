@@ -1,33 +1,48 @@
-import { TokenClassBody } from '@gala-chain/api';
-import { Types, Schema, Document } from 'mongoose';
+import {
+  GalaChainResponse,
+  TokenClassBody,
+  TokenInstanceKey,
+  TokenInstanceKeyBody,
+} from '@gala-chain/api';
+import { Schema, Document, ObjectId } from 'mongoose';
 import { MAX_ITERATIONS } from '../constant';
 
 export interface Winner {
-  userId: string;
-  winCount: string;
+  gcAddress: string;
+  winAmount: string;
   isDistributed: boolean;
+  error?: string;
 }
 
 export interface GiveawayDocument extends Document {
   endDateTime: Date;
+  givewayType: string;
   giveawayToken: TokenClassBody;
   tokenQuantity: string;
   winners: Winner[];
   winnerCount?: number;
   usersSignedUp: string[];
   distributed: boolean;
-  creator: Types.ObjectId;
+  creator: ObjectId;
+  telegramAuthRequired: boolean;
 }
 
 const WinnerSchema = new Schema<Winner>({
-  userId: { type: String, required: true },
-  winCount: { type: String, required: true },
+  gcAddress: { type: String, required: true },
+  winAmount: { type: String, required: true },
   isDistributed: { type: Boolean, default: false },
+  error: { type: String, required: false },
 });
 
 export const GiveawaySchema = new Schema<GiveawayDocument>({
+  givewayType: {
+    type: String,
+    required: false,
+    enum: ['randomized_iterative_giveway'],
+    default: 'randomized_iterative_giveway',
+  },
   endDateTime: { type: Date, required: true },
-
+  telegramAuthRequired: { type: Boolean, required: false, default: false },
   giveawayToken: {
     collection: { type: String, required: true },
     type: { type: String, required: true },
@@ -47,7 +62,17 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
       message: '{VALUE} is not an integer value',
     },
   },
-  usersSignedUp: { type: [String], default: [] },
+  usersSignedUp: {
+    type: [String],
+    default: [],
+    validate: {
+      validator: function (values: string[]) {
+        return values.every((value) => value.startsWith('eth|'));
+      },
+      message: (props) =>
+        `${props.value} is invalid. The address must start with "eth|".`,
+    },
+  },
   distributed: { type: Boolean, default: false },
 
   creator: { type: Schema.Types.ObjectId, ref: 'User', required: true },

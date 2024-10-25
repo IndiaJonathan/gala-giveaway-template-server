@@ -55,7 +55,7 @@ describe('GiveawayService', () => {
     const winners = giveawayService.determineWinners(giveaway);
 
     const totalDistributedTokens = winners.reduce(
-      (sum, winner) => sum.plus(new BigNumber(winner.winCount)),
+      (sum, winner) => sum.plus(new BigNumber(winner.winAmount)),
       new BigNumber(0),
     );
 
@@ -111,12 +111,12 @@ describe('GiveawayService', () => {
     // Ensure the only user receives all tokens
     expect(winners.length).toBe(1);
     expect(winners[0].userId).toBe('user1');
-    expect(winners[0].winCount).toBe(giveaway.tokenQuantity);
+    expect(winners[0].winAmount).toBe(giveaway.tokenQuantity);
     expect(winners[0].isDistributed).toBe(false);
 
     // Validate that the total tokens distributed equals the tokenQuantity
     const totalDistributedTokens = winners.reduce(
-      (sum, winner) => sum.plus(new BigNumber(winner.winCount)),
+      (sum, winner) => sum.plus(new BigNumber(winner.winAmount)),
       new BigNumber(0),
     );
     expect(
@@ -161,12 +161,12 @@ describe('GiveawayService', () => {
     };
 
     winners.forEach((winner) => {
-      expect(winner.winCount).toBe(expectedWinCounts[winner.userId]);
+      expect(winner.winAmount).toBe(expectedWinCounts[winner.userId]);
     });
     expect(winners.length).toBe(4);
 
     const totalDistributedTokens = winners.reduce(
-      (sum, winner) => sum.plus(new BigNumber(winner.winCount)),
+      (sum, winner) => sum.plus(new BigNumber(winner.winAmount)),
       new BigNumber(0),
     );
     expect(totalDistributedTokens.isEqualTo(giveaway.tokenQuantity)).toBe(true);
@@ -215,11 +215,11 @@ describe('GiveawayService', () => {
     expect(winners.length).toBe(4);
 
     winners.forEach((winner) => {
-      expect(winner.winCount).toBe(expectedWinCounts[winner.userId]);
+      expect(winner.winAmount).toBe(expectedWinCounts[winner.userId]);
     });
 
     const totalDistributedTokens = winners.reduce(
-      (sum, winner) => sum.plus(new BigNumber(winner.winCount)),
+      (sum, winner) => sum.plus(new BigNumber(winner.winAmount)),
       new BigNumber(0),
     );
     expect(
@@ -266,12 +266,14 @@ describe('GiveawayService', () => {
     };
 
     winners.forEach((winner) => {
-      expect(winner.winCount).toBe(expectedWinCounts[winner.userId].toString());
+      expect(winner.winAmount).toBe(
+        expectedWinCounts[winner.userId].toString(),
+      );
     });
     expect(winners.length).toBe(1);
 
     const totalDistributedTokens = winners.reduce(
-      (sum, winner) => sum.plus(new BigNumber(winner.winCount)),
+      (sum, winner) => sum.plus(new BigNumber(winner.winAmount)),
       new BigNumber(0),
     );
     expect(
@@ -286,7 +288,9 @@ describe('GiveawayService', () => {
     };
 
     winners.forEach((winner) => {
-      expect(winner.winCount).toBe(expectedWinCounts[winner.userId].toString());
+      expect(winner.winAmount).toBe(
+        expectedWinCounts[winner.userId].toString(),
+      );
     });
     jest.restoreAllMocks();
   });

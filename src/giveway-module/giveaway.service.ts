@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId } from 'mongoose';
 import { GiveawayDocument, Winner } from '../schemas/giveaway.schema';
@@ -29,6 +33,7 @@ export class GiveawayService {
       giveawayToken: giveawayDto.giveawayToken,
       tokenQuantity: giveawayDto.tokenQuantity,
       winnerCount: giveawayDto.winnerCount,
+      telegramAuthRequired: giveawayDto.telegramAuthRequired,
       creator: account.id,
     });
     return await newGiveaway.save();
@@ -73,7 +78,7 @@ export class GiveawayService {
     while (remainingTokens.gt(0)) {
       // Distribute minimum tokens to users
       const randomIndex = Math.floor(Math.random() * numberOfUsers);
-      const winnerId = usersSignedUp[randomIndex];
+      const winnerGcAddress = usersSignedUp[randomIndex];
 
       const tokensToDistribute = BigNumber.min(
         remainingTokens,
@@ -81,16 +86,17 @@ export class GiveawayService {
       );
       remainingTokens = remainingTokens.minus(tokensToDistribute);
 
-      if (!winnersMap[winnerId]) {
-        winnersMap[winnerId] = new BigNumber(0);
+      if (!winnersMap[winnerGcAddress]) {
+        winnersMap[winnerGcAddress] = new BigNumber(0);
       }
-      winnersMap[winnerId] = winnersMap[winnerId].plus(tokensToDistribute);
+      winnersMap[winnerGcAddress] =
+        winnersMap[winnerGcAddress].plus(tokensToDistribute);
     }
     // Convert the winnersMap to an array of Winner objects
     const winnersArray: Winner[] = Object.entries(winnersMap).map(
-      ([userId, winCount]) => ({
-        userId,
-        winCount: winCount.toString(),
+      ([gcAddress, winCount]) => ({
+        gcAddress,
+        winAmount: winCount.toString(),
         isDistributed: false,
       }),
     );
@@ -99,17 +105,34 @@ export class GiveawayService {
   }
 
   async signupUser(giveawayId: string, gcAddress: string): Promise<any> {
-    const giveaway = await this.giveawayModel
-      .findByIdAndUpdate(
-        giveawayId,
-        { $addToSet: { usersSignedUp: gcAddress } },
-        { new: true },
-      )
-      .exec();
+    if (!gcAddress.startsWith('eth|'))
+      throw new BadRequestException(
+        'GC Address must start with eth|, any others are unsupported at the moment.',
+      );
+    const giveaway = await this.giveawayModel.findById(giveawayId).exec();
 
     if (!giveaway) {
       throw new NotFoundException('Giveaway not found');
     }
+
+    if (giveaway.usersSignedUp.includes(gcAddress)) {
+      throw new BadRequestException(`You're already signed up!`);
+    }
+
+    if (giveaway.telegramAuthRequired) {
+      const getProfile = await this.profileService.findProfileByGC(
+        gcAddress,
+        true,
+      );
+      if (giveaway.telegramAuthRequired && !getProfile.telegramId) {
+        throw new BadRequestException(
+          'You must link your telegram account for this giveaway',
+        );
+      }
+    }
+
+    giveaway.usersSignedUp.push(gcAddress);
+    await giveaway.save();
 
     return {
       message: `User with address ${gcAddress} successfully signed up for giveaway ${giveawayId}`,
@@ -126,14 +149,14 @@ export class GiveawayService {
   async validateGiveawayIsActive(giveawayId: string): Promise<void> {
     const currentDate = new Date();
 
-    const giveaway = await this.giveawayModel
+    const result = await this.giveawayModel
       .findOne({
         _id: giveawayId,
         endDateTime: { $gt: currentDate },
       })
       .exec();
 
-    if (!giveaway) {
+    if (!result) {
       throw new NotFoundException(
         `Giveaway ${giveawayId} is not active or not found`,
       );

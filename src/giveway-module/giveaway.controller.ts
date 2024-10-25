@@ -76,9 +76,7 @@ export class GiveawayController {
       signUpData,
       '',
     );
-    const gc_address = signatures
-      .getEthAddress(publicKey)
-      .replace('0x', 'eth|');
+    const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
     const signupResult = await this.giveawayService.signupUser(
       signUpData.giveawayId,
       gc_address,

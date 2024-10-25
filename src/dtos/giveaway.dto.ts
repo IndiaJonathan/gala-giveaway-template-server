@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsNumberString,
   Validate,
+  IsBoolean,
 } from 'class-validator';
 
 export class GiveawayDto {
@@ -14,6 +15,10 @@ export class GiveawayDto {
   @IsNotEmpty()
   @IsNumberString()
   tokenQuantity: string;
+
+  @IsNotEmpty()
+  @IsBoolean()
+  telegramAuthRequired: boolean;
 
   @IsNotEmpty()
   @IsNumberString()

@@ -54,7 +54,7 @@ export class ProfileService {
   }
 
   // Create a new profile
-  async createProfile(profileDto: ProfileDto) {
+  async createProfile(ethAddress: string, galaChainAddress: string) {
     const registrationURL = await this.secretsService.getSecret(
       'REGISTRATION_ENDPOINT',
     );
@@ -63,18 +63,13 @@ export class ProfileService {
       await WalletUtils.createAndRegisterRandomWallet(registrationURL);
     // Create a new profile object with the unique fields
     const newProfile = new this.profileModel({
-      ethAddress: profileDto.ethAddress,
-      galaChainAddress: profileDto.galaChainAddress,
-      telegramId: profileDto.id,
-      firstName: profileDto.first_name,
-      lastName: profileDto.last_name,
-      createdAt: new Date(),
+      ethAddress: ethAddress,
+      galaChainAddress: galaChainAddress,
       giveawayWalletAddress: giveawayWalletAddress.galachainAddress,
       giveawayWalletAddressPrivateKey: giveawayWalletAddress.privateKey,
     });
 
     try {
-      // Insert the profile into the database
       const result = await newProfile.save();
       return result;
     } catch (error) {
@@ -87,7 +82,6 @@ export class ProfileService {
         }
       }
       console.error(error);
-      // Handle other errors
       throw new Error('An error occurred while creating the profile.');
     }
   }
@@ -95,6 +89,11 @@ export class ProfileService {
   // Find all profiles
   async findAllProfiles(): Promise<ProfileDocument[]> {
     return this.profileModel.find().exec();
+  }
+
+  // Find profile by id
+  async findProfile(profileId: ObjectId): Promise<ProfileDocument> {
+    return this.profileModel.findOne({ _id: profileId }).exec();
   }
 
   async findProfileByGC(gcAddress: string, createIfNotFound = false) {
@@ -105,10 +104,10 @@ export class ProfileService {
     // If the profile is not found, throw a NotFoundException
     if (!profile) {
       if (createIfNotFound) {
-        const profile = this.createProfile({
-          galaChainAddress: gcAddress,
-          ethAddress: gcAddress.replace('eth|', '0x'),
-        });
+        const profile = this.createProfile(
+          gcAddress.replace('eth|', '0x'),
+          gcAddress,
+        );
         return profile;
       } else {
         throw new NotFoundException(

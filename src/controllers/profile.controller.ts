@@ -7,12 +7,14 @@ import {
   UnauthorizedException,
   HttpException,
   Param,
+  ConflictException,
 } from '@nestjs/common';
 import { BabyOpsApi } from '../services/baby-ops.service';
 import { SecretConfigService } from '../secrets/secrets.service';
 import { signatures } from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
 import { LinkDto } from '../dtos/profile.dto';
+import { MongoError } from 'mongodb';
 
 @Controller('api/profile')
 export class ProfileController {
@@ -62,11 +64,28 @@ export class ProfileController {
 
     // If Telegram authorization is valid, create the profile
     if (isTelegramValid) {
-      const profile = await this.profileService.createProfile({
-        ...linkDto,
-        ethAddress: linkDto['GalaChain Address'].replace('eth|', '0x'),
-        galaChainAddress: linkDto['GalaChain Address'],
-      });
+      const profile = await this.profileService.findProfileByGC(
+        linkDto['GalaChain Address'],
+        true,
+      );
+      profile.telegramId = linkDto.id;
+      profile.firstName = linkDto.first_name;
+      profile.lastName = linkDto.last_name;
+      try {
+        await profile.save();
+      } catch (error) {
+        if (error.code === 11000) {
+          // Handle duplicate key error (error code 11000 indicates duplicate key violation)
+          if (error.message.includes('ethAddress_1')) {
+            throw new ConflictException('EthAddress already exists.');
+          } else if (error.message.includes('telegramId_1')) {
+            throw new ConflictException('TelegramId already exists.');
+          } else {
+            throw new ConflictException(`Already linked!`);
+          }
+        }
+      }
+
       return profile;
     } else {
       throw new UnauthorizedException({
