@@ -63,7 +63,7 @@ export class GiveawayService {
     );
 
     if (usersSignedUp.length === 0) {
-      throw new Error('No users signed up for the giveaway.');
+      return [];
     }
 
     let remainingTokens = new BigNumber(giveaway.tokenQuantity);

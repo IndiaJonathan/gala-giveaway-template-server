@@ -42,37 +42,24 @@ export class GivewayScheduler {
         console.log(`Determined ${giveaway.winners} winners`);
       }
       await giveaway.save();
-      let hasErrors = false;
       try {
-        for (let index = 0; index < winners.length; index++) {
-          const winner = winners[index];
-          if (winner.isDistributed) continue;
-          try {
-            const mintResult = await tokenApi.MintToken({
-              owner: winner.gcAddress,
-              quantity: winner.winAmount,
-              tokenClass: giveaway.giveawayToken,
-            });
-            if ((mintResult as any).Status === 1) {
-              winner.isDistributed = true;
-              winner.error = null;
-            } else {
-              winner.error =
-                mintResult.message || 'Unable to mint to user, unknown error';
-              hasErrors = true;
-            }
-          } catch (transferError) {
-            console.error(
-              `Transfer error for winner: ${winner.gcAddress}, ${JSON.stringify(transferError)}`,
-            );
-            winner.error = JSON.stringify(transferError);
-          }
-        }
-        if (!hasErrors) {
+        const mappedWinners = winners.map((winner) => ({
+          owner: winner.gcAddress,
+          quantity: winner.winAmount,
+          tokenClass: giveaway.giveawayToken,
+        }));
+        const mintResult = await tokenApi.BatchMintToken({
+          mintDtos: mappedWinners,
+        });
+        if ((mintResult as any).Status === 1) {
           giveaway.distributed = true;
           console.log(`Giveway done!`);
         } else {
-          console.log('Giveaway had errors, will retry later');
+          giveaway.error = mintResult.message;
+          console.log(
+            `Giveaway had errors, will retry later. Error: ${giveaway.error}`,
+          );
+          await giveaway.save();
         }
       } catch (e) {
         console.error(e);

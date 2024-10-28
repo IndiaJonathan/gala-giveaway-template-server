@@ -11,7 +11,6 @@ import { Response } from 'express';
 import { GiveawayDto } from '../dtos/giveaway.dto';
 import { GiveawayService } from './giveaway.service';
 import { signatures } from '@gala-chain/api';
-import { SecretConfigService } from '../secrets/secrets.service';
 import { SignupGiveawayDto } from '../dtos/signup-giveaway.dto';
 import { BabyOpsApi } from '../services/baby-ops.service';
 import { ProfileService } from '../services/profile.service';

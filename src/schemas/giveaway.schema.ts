@@ -2,7 +2,6 @@ import {
   GalaChainResponse,
   TokenClassBody,
   TokenInstanceKey,
-  TokenInstanceKeyBody,
 } from '@gala-chain/api';
 import { Schema, Document, ObjectId } from 'mongoose';
 import { MAX_ITERATIONS } from '../constant';
@@ -10,8 +9,6 @@ import { MAX_ITERATIONS } from '../constant';
 export interface Winner {
   gcAddress: string;
   winAmount: string;
-  isDistributed: boolean;
-  error?: string;
 }
 
 export interface GiveawayDocument extends Document {
@@ -25,13 +22,12 @@ export interface GiveawayDocument extends Document {
   distributed: boolean;
   creator: ObjectId;
   telegramAuthRequired: boolean;
+  error: string;
 }
 
 const WinnerSchema = new Schema<Winner>({
   gcAddress: { type: String, required: true },
   winAmount: { type: String, required: true },
-  isDistributed: { type: Boolean, default: false },
-  error: { type: String, required: false },
 });
 
 export const GiveawaySchema = new Schema<GiveawayDocument>({
@@ -49,6 +45,7 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
     category: { type: String, required: true },
     additionalKey: { type: String, required: true },
   },
+  error: { type: String, required: false },
 
   tokenQuantity: { type: String, required: true },
 
