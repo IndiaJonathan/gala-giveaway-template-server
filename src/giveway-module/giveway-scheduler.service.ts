@@ -41,7 +41,13 @@ export class GivewayScheduler {
         giveaway.winners = winners;
         console.log(`Determined ${giveaway.winners} winners`);
       }
-      await giveaway.save();
+      if (winners.length === 0) {
+        giveaway.distributed = true;
+        await giveaway.save();
+        continue;
+      } else {
+        await giveaway.save();
+      }
       try {
         const mappedWinners = winners.map((winner) => ({
           owner: winner.gcAddress,
