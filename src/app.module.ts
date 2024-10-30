@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { WalletController } from './controllers/wallet.controller';
 import { BabyOpsApi } from './services/baby-ops.service';
 import { AppController } from './app.controller';
@@ -13,12 +12,7 @@ import { DatabaseModule } from './mongoose-module/database.module';
 import { StartupService } from './services/startup';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot(),
-    GiveawayModule,
-    SecretConfigModule,
-    DatabaseModule,
-  ],
+  imports: [GiveawayModule, SecretConfigModule, DatabaseModule],
   controllers: [AppController, WalletController, ProfileController],
   providers: [
     BabyOpsApi,

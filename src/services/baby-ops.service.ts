@@ -4,8 +4,9 @@ import {
   createValidDTO,
   FetchAllowancesDto,
   FetchBalancesDto,
-  TokenAllowanceBody,
-  TokenClassBody,
+  TokenAllowance,
+  TokenClass,
+  TokenClassKey,
 } from '@gala-chain/api';
 import BigNumber from 'bignumber.js';
 import { GiveawayService } from '../giveway-module/giveaway.service';
@@ -47,7 +48,7 @@ export class BabyOpsApi implements OnModuleInit {
   async getTotalAllowanceQuantity(
     giveawayWalletAddress: string,
     ownerId: ObjectId,
-    tokenClassKey: TokenClassBody,
+    tokenClassKey: TokenClassKey,
   ) {
     const allowances = await this.getAllowancesForToken(
       giveawayWalletAddress,
@@ -56,7 +57,7 @@ export class BabyOpsApi implements OnModuleInit {
 
     let totalQuantity = BigNumber(0);
     let unusableQuantity = BigNumber(0);
-    ((allowances as any).Data.results as TokenAllowanceBody[]).forEach(
+    ((allowances as any).Data.results as TokenAllowance[]).forEach(
       (tokenAllowance) => {
         const quantityAvailable = BigNumber(tokenAllowance.quantity).minus(
           BigNumber(tokenAllowance.quantitySpent),
@@ -82,7 +83,7 @@ export class BabyOpsApi implements OnModuleInit {
     );
 
     const undistributedGiveways =
-      await this.giveawayService.findUndistributed(ownerId);
+      await this.giveawayService.findUndistributed(ownerId, tokenClassKey);
 
     undistributedGiveways.forEach((giveaway) => {
       totalQuantity = BigNumber(totalQuantity).minus(giveaway.tokenQuantity);
@@ -93,7 +94,7 @@ export class BabyOpsApi implements OnModuleInit {
 
   async getAllowancesForToken(
     ownerAddress: string,
-    tokenClassKey: TokenClassBody,
+    tokenClassKey: TokenClassKey,
   ) {
     const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
     const fetchAllowanceDto = await createValidDTO<FetchAllowancesDto>(

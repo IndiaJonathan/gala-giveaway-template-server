@@ -11,7 +11,6 @@ import {
 import { BabyOpsApi } from '../services/baby-ops.service';
 import { SecretConfigService } from '../secrets/secrets.service';
 import { Response } from 'express';
-import { TokenClassBody } from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
 
 @Controller('api/wallet')
@@ -73,7 +72,7 @@ export class WalletController {
   @Post('allowance-available/:gcAddress')
   async getAllowanceAvailable(
     @Param('gcAddress') gcAddress: string,
-    @Body() tokenClass: TokenClassBody,
+    @Body() tokenClass: any,
   ) {
     const userInfo = await this.profileService.findProfileByGC(gcAddress);
     return this.tokenService.getTotalAllowanceQuantity(

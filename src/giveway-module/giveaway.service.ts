@@ -6,7 +6,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId } from 'mongoose';
 import { GiveawayDocument, Winner } from '../schemas/giveaway.schema';
-import { signatures } from '@gala-chain/api';
+import { signatures, TokenClassKey } from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
 import BigNumber from 'bignumber.js';
 import { GiveawayDto } from '../dtos/giveaway.dto';
@@ -43,8 +43,8 @@ export class GiveawayService {
     return this.giveawayModel.find().exec();
   }
 
-  async findUndistributed(creator: ObjectId): Promise<GiveawayDocument[]> {
-    return this.giveawayModel.find({ creator, distributed: false }).exec();
+  async findUndistributed(creator: ObjectId, tokenClass: TokenClassKey): Promise<GiveawayDocument[]> {
+    return this.giveawayModel.find({ creator, distributed: false, giveawayToken: tokenClass }).exec();
   }
   async findReadyForDistribution(): Promise<GiveawayDocument[]> {
     const currentDate = new Date();

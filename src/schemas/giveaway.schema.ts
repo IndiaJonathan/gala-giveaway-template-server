@@ -1,6 +1,6 @@
 import {
   GalaChainResponse,
-  TokenClassBody,
+  TokenClass,
   TokenInstanceKey,
 } from '@gala-chain/api';
 import { Schema, Document, ObjectId } from 'mongoose';
@@ -14,7 +14,7 @@ export interface Winner {
 export interface GiveawayDocument extends Document {
   endDateTime: Date;
   givewayType: string;
-  giveawayToken: TokenClassBody;
+  giveawayToken: TokenClass;
   tokenQuantity: string;
   winners: Winner[];
   winnerCount?: number;
