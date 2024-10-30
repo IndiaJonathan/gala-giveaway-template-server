@@ -55,13 +55,13 @@ export class GivewayScheduler {
           tokenClass: giveaway.giveawayToken,
         }));
         const mintResult = await tokenApi.BatchMintToken({
-          mintDtos: mappedWinners,
+          mintDtos: mappedWinners as any,
         });
-        if ((mintResult as any).Status === 1) {
+        if (mintResult.Status === 1) {
           giveaway.distributed = true;
           console.log(`Giveway done!`);
         } else {
-          giveaway.error = mintResult.message;
+          giveaway.error = (mintResult as any).message;
           console.log(
             `Giveaway had errors, will retry later. Error: ${giveaway.error}`,
           );

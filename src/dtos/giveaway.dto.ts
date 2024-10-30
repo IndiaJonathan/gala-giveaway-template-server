@@ -1,4 +1,4 @@
-import { TokenClassBody } from '@gala-chain/api';
+import { TokenClass } from '@gala-chain/connect';
 import {
   IsNotEmpty,
   IsString,
@@ -10,7 +10,7 @@ import {
 
 export class GiveawayDto {
   @IsNotEmpty()
-  giveawayToken: TokenClassBody;
+  giveawayToken: any;
 
   @IsNotEmpty()
   @IsNumberString()
