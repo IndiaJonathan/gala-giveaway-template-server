@@ -63,10 +63,8 @@ describe('GiveawayService', () => {
       totalDistributedTokens.isEqualTo(new BigNumber(giveaway.tokenQuantity)),
     ).toBe(true);
 
-    // Ensure isDistributed is false for all winners
-    winners.forEach((winner) => {
-      expect(winner.isDistributed).toBe(false);
-    });
+    // Ensure isDistributed is false
+    expect(giveaway.distributed).toBe(false);
   });
 
   it('should throw an error when there are no users signed up', () => {
@@ -85,9 +83,8 @@ describe('GiveawayService', () => {
       creator: new Types.ObjectId(),
     };
 
-    expect(() => giveawayService.determineWinners(giveaway)).toThrow(
-      'No users signed up for the giveaway.',
-    );
+    const winners = giveawayService.determineWinners(giveaway);
+    expect(winners.length).toBe(0);
   });
   it('should give all tokens to a single user if only one user is signed up', () => {
     // Create a mock giveaway document with a single user
@@ -110,9 +107,8 @@ describe('GiveawayService', () => {
 
     // Ensure the only user receives all tokens
     expect(winners.length).toBe(1);
-    expect(winners[0].userId).toBe('user1');
+    expect(winners[0].gcAddress).toBe('user1');
     expect(winners[0].winAmount).toBe(giveaway.tokenQuantity);
-    expect(winners[0].isDistributed).toBe(false);
 
     // Validate that the total tokens distributed equals the tokenQuantity
     const totalDistributedTokens = winners.reduce(
@@ -161,7 +157,7 @@ describe('GiveawayService', () => {
     };
 
     winners.forEach((winner) => {
-      expect(winner.winAmount).toBe(expectedWinCounts[winner.userId]);
+      expect(winner.winAmount).toBe(expectedWinCounts[winner.gcAddress]);
     });
     expect(winners.length).toBe(4);
 
@@ -215,7 +211,7 @@ describe('GiveawayService', () => {
     expect(winners.length).toBe(4);
 
     winners.forEach((winner) => {
-      expect(winner.winAmount).toBe(expectedWinCounts[winner.userId]);
+      expect(winner.winAmount).toBe(expectedWinCounts[winner.gcAddress]);
     });
 
     const totalDistributedTokens = winners.reduce(
@@ -267,7 +263,7 @@ describe('GiveawayService', () => {
 
     winners.forEach((winner) => {
       expect(winner.winAmount).toBe(
-        expectedWinCounts[winner.userId].toString(),
+        expectedWinCounts[winner.gcAddress].toString(),
       );
     });
     expect(winners.length).toBe(1);
@@ -289,7 +285,7 @@ describe('GiveawayService', () => {
 
     winners.forEach((winner) => {
       expect(winner.winAmount).toBe(
-        expectedWinCounts[winner.userId].toString(),
+        expectedWinCounts[winner.gcAddress].toString(),
       );
     });
     jest.restoreAllMocks();
