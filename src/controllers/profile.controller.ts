@@ -8,19 +8,18 @@ import {
   HttpException,
   Param,
   ConflictException,
+  Inject,
 } from '@nestjs/common';
-import { BabyOpsApi } from '../services/baby-ops.service';
-import { SecretConfigService } from '../secrets/secrets.service';
 import { signatures } from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
 import { LinkDto } from '../dtos/profile.dto';
+import { APP_SECRETS } from '../secrets/secrets.module';
 
 @Controller('api/profile')
 export class ProfileController {
   constructor(
-    private tokenService: BabyOpsApi,
-    private secretsService: SecretConfigService,
     private profileService: ProfileService,
+    @Inject(APP_SECRETS) private secrets: Record<string, any>,
   ) {}
 
   @Get('info/:gcAddress')
@@ -30,7 +29,7 @@ export class ProfileController {
 
   @Post('link-accounts')
   async linkAccounts(@Body() linkDto: LinkDto) {
-    const botToken = await this.secretsService.getSecret('TELEGRAM_BOT_TOKEN');
+    const botToken = await this.secrets['TELEGRAM_BOT_TOKEN'];
 
     if (!botToken) {
       throw new HttpException(

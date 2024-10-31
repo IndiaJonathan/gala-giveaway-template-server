@@ -1,17 +1,17 @@
 import { MongoClient, Db } from 'mongodb';
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { SecretConfigService } from '../secrets/secrets.service';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { APP_SECRETS } from '../secrets/secrets.module';
 
 @Injectable()
 export class DatabaseService implements OnModuleInit {
   private client: MongoClient;
   private db: Db;
 
-  constructor(private secretsService: SecretConfigService) {}
+  constructor(@Inject(APP_SECRETS) private secrets: Record<string, any>) {}
 
   async onModuleInit(): Promise<void> {
-    const MONGO_URI = await this.secretsService.getSecret('MONGO_URI');
-    const DB = await this.secretsService.getSecret('DB');
+    const MONGO_URI = await this.secrets['MONGO_URI'];
+    const DB = await this.secrets['DB'];
     this.client = new MongoClient(MONGO_URI);
     await this.client.connect();
     this.db = this.client.db(DB);
