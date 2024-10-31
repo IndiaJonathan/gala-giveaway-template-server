@@ -14,7 +14,6 @@ import { SecretConfigService } from '../secrets/secrets.service';
 import { signatures } from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
 import { LinkDto } from '../dtos/profile.dto';
-import { MongoError } from 'mongodb';
 
 @Controller('api/profile')
 export class ProfileController {

@@ -1,8 +1,4 @@
-import {
-  GalaChainResponse,
-  TokenClass,
-  TokenInstanceKey,
-} from '@gala-chain/api';
+import { TokenClass } from '@gala-chain/api';
 import { Schema, Document, ObjectId } from 'mongoose';
 import { MAX_ITERATIONS } from '../constant';
 
