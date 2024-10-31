@@ -43,8 +43,13 @@ export class GiveawayService {
     return this.giveawayModel.find().exec();
   }
 
-  async findUndistributed(creator: ObjectId, tokenClass: TokenClassKey): Promise<GiveawayDocument[]> {
-    return this.giveawayModel.find({ creator, distributed: false, giveawayToken: tokenClass }).exec();
+  async findUndistributed(
+    creator: ObjectId,
+    tokenClass: TokenClassKey,
+  ): Promise<GiveawayDocument[]> {
+    return this.giveawayModel
+      .find({ creator, distributed: false, giveawayToken: tokenClass })
+      .exec();
   }
   async findReadyForDistribution(): Promise<GiveawayDocument[]> {
     const currentDate = new Date();

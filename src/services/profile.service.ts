@@ -8,7 +8,7 @@ import { omit } from 'lodash';
 import { Model, ObjectId } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { ProfileDocument } from '../schemas/ProfileSchema';
-import { LinkDto, ProfileDto } from '../dtos/profile.dto';
+import { LinkDto } from '../dtos/profile.dto';
 import { MongoError } from 'mongodb';
 import { WalletUtils } from '@gala-chain/connect';
 import { SecretConfigService } from '../secrets/secrets.service';

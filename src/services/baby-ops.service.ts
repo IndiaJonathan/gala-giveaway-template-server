@@ -5,7 +5,6 @@ import {
   FetchAllowancesDto,
   FetchBalancesDto,
   TokenAllowance,
-  TokenClass,
   TokenClassKey,
 } from '@gala-chain/api';
 import BigNumber from 'bignumber.js';
@@ -82,8 +81,10 @@ export class BabyOpsApi implements OnModuleInit {
       },
     );
 
-    const undistributedGiveways =
-      await this.giveawayService.findUndistributed(ownerId, tokenClassKey);
+    const undistributedGiveways = await this.giveawayService.findUndistributed(
+      ownerId,
+      tokenClassKey,
+    );
 
     undistributedGiveways.forEach((giveaway) => {
       totalQuantity = BigNumber(totalQuantity).minus(giveaway.tokenQuantity);

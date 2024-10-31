@@ -1,4 +1,3 @@
-import { TokenClass } from '@gala-chain/connect';
 import {
   IsNotEmpty,
   IsString,
