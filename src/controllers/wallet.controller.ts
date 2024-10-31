@@ -7,24 +7,25 @@ import {
   Body,
   Param,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { BabyOpsApi } from '../services/baby-ops.service';
-import { SecretConfigService } from '../secrets/secrets.service';
 import { Response } from 'express';
 import { ProfileService } from '../services/profile.service';
+import { APP_SECRETS } from '../secrets/secrets.module';
 
 @Controller('api/wallet')
 export class WalletController {
   constructor(
     private tokenService: BabyOpsApi,
-    private secretsService: SecretConfigService,
+    @Inject(APP_SECRETS) private secrets: Record<string, any>,
     private profileService: ProfileService,
   ) {}
 
   @Get('generateWallet')
   async generateWallet(@Res() res: Response) {
     try {
-      const registrationEndpoint = await this.secretsService.getSecret(
+      const registrationEndpoint = await this.secrets.getSecret(
         'REGISTRATION_ENDPOINT',
       );
       const wallet =

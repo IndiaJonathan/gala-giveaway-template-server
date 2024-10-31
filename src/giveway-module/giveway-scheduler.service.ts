@@ -1,16 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { GiveawayService } from './giveaway.service';
 import { ProfileService } from '../services/profile.service';
 import { SigningClient, TokenApi } from '@gala-chain/connect';
 import { SecretConfigService } from '../secrets/secrets.service';
+import { APP_SECRETS } from '../secrets/secrets.module';
 
 @Injectable()
 export class GivewayScheduler {
   constructor(
     private giveawayService: GiveawayService,
     private profileService: ProfileService,
-    private secretsService: SecretConfigService,
+    @Inject(APP_SECRETS) private secrets: Record<string, any>,
   ) {}
 
   @Cron('0 * * * * *') // This cron expression runs every minute on the 0th second
@@ -20,17 +21,14 @@ export class GivewayScheduler {
       return;
     }
 
-    const tokenApiEndpoint =
-      await this.secretsService.getSecret('TOKEN_API_ENDPOINT');
+    const tokenApiEndpoint = this.secrets['TOKEN_API_ENDPOINT'];
 
     for (let index = 0; index < giveaways.length; index++) {
       const giveaway = giveaways[index];
       const creatorProfile = await this.profileService.findProfile(
         giveaway.creator,
       );
-      const decryptedKey = await creatorProfile.decryptPrivateKey(
-        this.secretsService,
-      );
+      const decryptedKey = await creatorProfile.decryptPrivateKey();
       const giveawayWalletSigner = new SigningClient(decryptedKey);
       const tokenApi = new TokenApi(tokenApiEndpoint, giveawayWalletSigner);
 

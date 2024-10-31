@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { TokenApi, SigningClient, WalletUtils } from '@gala-chain/connect';
 import {
   createValidDTO,
@@ -10,7 +10,7 @@ import {
 import BigNumber from 'bignumber.js';
 import { GiveawayService } from '../giveway-module/giveaway.service';
 import { ObjectId } from 'mongoose';
-import { SecretConfigService } from '../secrets/secrets.service';
+import { APP_SECRETS } from '../secrets/secrets.module';
 
 @Injectable()
 export class BabyOpsApi implements OnModuleInit {
@@ -18,16 +18,13 @@ export class BabyOpsApi implements OnModuleInit {
   private tokenApiEndpoint: string;
 
   async onModuleInit() {
-    this.tokenApiEndpoint =
-      await this.secretsService.getSecret('TOKEN_API_ENDPOINT');
-    const privateKey = await this.secretsService.getSecret(
-      'GIVEAWAY_PRIVATE_KEY',
-    );
+    this.tokenApiEndpoint = await this.secrets['TOKEN_API_ENDPOINT'];
+    const privateKey = await this.secrets['GIVEAWAY_PRIVATE_KEY'];
     this.adminSigner = new SigningClient(privateKey);
   }
   constructor(
     private giveawayService: GiveawayService,
-    private secretsService: SecretConfigService,
+    @Inject(APP_SECRETS) private secrets: Record<string, any>,
   ) {}
   getGCAddress(address: string) {
     return address.replace('0x', 'eth|');

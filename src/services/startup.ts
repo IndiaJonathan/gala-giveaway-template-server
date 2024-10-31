@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import {
   SigningClient,
   WalletUtils,
@@ -7,25 +7,20 @@ import {
 } from '@gala-chain/connect';
 import { SecretConfigService } from '../secrets/secrets.service';
 import { Wallet } from 'ethers';
+import { APP_SECRETS } from '../secrets/secrets.module';
 
 @Injectable()
 export class StartupService implements OnModuleInit {
   private adminWallet: Wallet;
   private publicKeyEndpoint: string;
 
-  constructor(private secretsService: SecretConfigService) {}
+  constructor(@Inject(APP_SECRETS) private secrets: Record<string, any>) {}
   async onModuleInit() {
-    const registrationEndpoint = await this.secretsService.getSecret(
-      'REGISTRATION_ENDPOINT',
-    );
-    const privateKey = await this.secretsService.getSecret(
-      'GIVEAWAY_PRIVATE_KEY',
-    );
+    const registrationEndpoint = await this.secrets['REGISTRATION_ENDPOINT'];
+    const privateKey = await this.secrets['GIVEAWAY_PRIVATE_KEY'];
     this.adminWallet = new Wallet(privateKey);
     const client = new SigningClient(privateKey);
-    this.publicKeyEndpoint = await this.secretsService.getSecret(
-      'PUBLIC_KEY_API_ENDPOINT',
-    );
+    this.publicKeyEndpoint = await this.secrets['PUBLIC_KEY_API_ENDPOINT'];
 
     const publicKeyApi = new PublicKeyApi(this.publicKeyEndpoint, client);
 

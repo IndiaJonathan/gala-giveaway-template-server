@@ -11,7 +11,7 @@ export interface ProfileDocument extends Document {
   createdAt: Date;
   giveawayWalletAddress: string;
   giveawayWalletAddressPrivateKey: string;
-  decryptPrivateKey(secretService: SecretConfigService): Promise<string>;
+  decryptPrivateKey(): Promise<string>;
 }
 
 export const ProfileSchema = new Schema<ProfileDocument>({
@@ -73,8 +73,10 @@ const ivLength = 16;
 // Mongoose pre-save hook to encrypt the private key before saving
 ProfileSchema.pre('save', async function (next) {
   const profile = this as ProfileDocument;
+  const secretService = new SecretConfigService();
 
-  const encryptionKey = await getEncryptionKey();
+  const secrets = await secretService.getSecret();
+  const encryptionKey = await getEncryptionKey(secrets['ENCRYPTION_KEY']);
   if (
     profile.giveawayWalletAddressPrivateKey &&
     profile.isModified('giveawayWalletAddressPrivateKey')
@@ -98,14 +100,12 @@ ProfileSchema.pre('save', async function (next) {
   next();
 });
 
-async function getEncryptionKey() {
-  const secretService = new SecretConfigService();
+async function getEncryptionKey(encryptionKeyPartial: string) {
 
-  const encryptionKey = await secretService.getSecret('ENCRYPTION_KEY');
-  if (!encryptionKey) throw new Error('Encryption key not set');
+  if (!encryptionKeyPartial) throw new Error('Encryption key not set');
   // Derive a 32-byte key from the encryption key using scrypt
   const key = await new Promise<Buffer>((resolve, reject) => {
-    crypto.scrypt(encryptionKey, 'salt', 32, (err, derivedKey) => {
+    crypto.scrypt(encryptionKeyPartial, 'salt', 32, (err, derivedKey) => {
       if (err) reject(err);
       resolve(derivedKey);
     });
@@ -113,14 +113,16 @@ async function getEncryptionKey() {
   return key;
 }
 // Helper function to decrypt the private key when needed
-ProfileSchema.methods.decryptPrivateKey = async function (): Promise<string> {
+ProfileSchema.methods.decryptPrivateKey = async function (
+  encryptionKeyPartial: string,
+): Promise<string> {
   if (!this.giveawayWalletAddressPrivateKey) return null;
 
-  const encryptionKey = await getEncryptionKey();
+  const encryptionKeyFull = await getEncryptionKey(encryptionKeyPartial);
   const [ivHex, encrypted] = this.giveawayWalletAddressPrivateKey.split(':');
   const iv = Buffer.from(ivHex, 'hex');
 
-  const decipher = crypto.createDecipheriv(algorithm, encryptionKey, iv);
+  const decipher = crypto.createDecipheriv(algorithm, encryptionKeyFull, iv);
   let decrypted = decipher.update(encrypted, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
 

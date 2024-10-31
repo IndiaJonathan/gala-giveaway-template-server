@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,14 +12,14 @@ import { ProfileDocument } from '../schemas/ProfileSchema';
 import { LinkDto } from '../dtos/profile.dto';
 import { MongoError } from 'mongodb';
 import { WalletUtils } from '@gala-chain/connect';
-import { SecretConfigService } from '../secrets/secrets.service';
+import { APP_SECRETS } from '../secrets/secrets.module';
 
 @Injectable()
 export class ProfileService {
   constructor(
     @InjectModel('Profile') // Inject the Mongoose model for Profile
     private readonly profileModel: Model<ProfileDocument>,
-    private secretsService: SecretConfigService,
+    @Inject(APP_SECRETS) private secrets: Record<string, any>,
   ) {}
 
   // Method to check Telegram authorization using HMAC
@@ -55,9 +56,7 @@ export class ProfileService {
 
   // Create a new profile
   async createProfile(ethAddress: string, galaChainAddress: string) {
-    const registrationURL = await this.secretsService.getSecret(
-      'REGISTRATION_ENDPOINT',
-    );
+    const registrationURL = await this.secrets['REGISTRATION_ENDPOINT'];
 
     const giveawayWalletAddress =
       await WalletUtils.createAndRegisterRandomWallet(registrationURL);

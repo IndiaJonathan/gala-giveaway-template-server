@@ -4,14 +4,13 @@ import fs from 'fs';
 
 @Injectable()
 export class SecretConfigService {
-  async getSecret(key?: string) {
+  async getSecret() {
     const secretsId = process.env.AWS_SECRETS_ID ?? 'local/gala-giveaway';
-
     // required for secrets manager, so if present prefer using it
     if (!process.env.TESTING && process.env.AWS_REGION) {
       const secretsManager = new SecretsManager({});
       const secret = await secretsManager.getSecretValue({
-        SecretId: key || secretsId,
+        SecretId: secretsId,
       });
       if (secret && secret.SecretString) {
         const parsedSecret = JSON.parse(secret.SecretString);
@@ -39,9 +38,6 @@ export class SecretConfigService {
         console.warn(
           `Secrets is undefined for secretId: ${secretsId}. Double check your secrets.json and .env`,
         );
-      }
-      if (key) {
-        return secrets[key];
       }
 
       return secrets;
