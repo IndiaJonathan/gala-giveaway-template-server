@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { WalletController } from './controllers/wallet.controller';
 import { BabyOpsApi } from './services/baby-ops.service';
 import { AppController } from './app.controller';
-import { DatabaseService } from './services/mongo';
 import { GiveawayService } from './giveway-module/giveaway.service';
 import { ProfileController } from './controllers/profile.controller';
 import { ProfileService } from './services/profile.service';
@@ -14,12 +13,6 @@ import { StartupService } from './services/startup';
 @Module({
   imports: [GiveawayModule, SecretConfigModule, DatabaseModule],
   controllers: [AppController, WalletController, ProfileController],
-  providers: [
-    BabyOpsApi,
-    DatabaseService,
-    GiveawayService,
-    ProfileService,
-    StartupService,
-  ],
+  providers: [BabyOpsApi, GiveawayService, ProfileService, StartupService],
 })
 export class AppModule {}
