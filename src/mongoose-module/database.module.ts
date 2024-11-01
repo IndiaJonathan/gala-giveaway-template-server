@@ -17,9 +17,6 @@ import { Module } from '@nestjs/common';
           uri: MONGO_URI,
           dbName: DB,
           ssl: true,
-          sslValidate: false,
-          useNewUrlParser: true,
-          useUnifiedTopology: true,
         };
       },
     }),
