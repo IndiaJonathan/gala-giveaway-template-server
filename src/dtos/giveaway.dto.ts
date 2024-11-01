@@ -5,6 +5,7 @@ import {
   IsNumberString,
   Validate,
   IsBoolean,
+  ValidateIf,
 } from 'class-validator';
 
 export class GiveawayDto {
@@ -33,4 +34,22 @@ export class GiveawayDto {
     message: 'endTime must be a valid ISO 8601 date string',
   })
   endDateTime?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  requireBurnTokenToClaim?: boolean;
+
+  @ValidateIf((o) => o.requireBurnTokenToClaim === true)
+  @IsNotEmpty({
+    message:
+      'burnTokenQuantity is required when requireBurnTokenToClaim is true',
+  })
+  @IsNumberString()
+  burnTokenQuantity?: string;
+
+  @ValidateIf((o) => o.requireBurnTokenToClaim === true)
+  @IsNotEmpty({
+    message: 'burnToken is required when requireBurnTokenToClaim is true',
+  })
+  burnToken?: any;
 }
