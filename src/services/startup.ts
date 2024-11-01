@@ -5,7 +5,6 @@ import {
   PublicKeyApi,
   GalaChainResponseError,
 } from '@gala-chain/connect';
-import { SecretConfigService } from '../secrets/secrets.service';
 import { Wallet } from 'ethers';
 import { APP_SECRETS } from '../secrets/secrets.module';
 

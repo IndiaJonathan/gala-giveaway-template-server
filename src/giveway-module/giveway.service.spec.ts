@@ -5,6 +5,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { ProfileService } from '../services/profile.service';
 import { SecretConfigService } from '../secrets/secrets.service';
 import BigNumber from 'bignumber.js';
+import { SecretConfigModule } from '../secrets/secrets.module';
 
 describe('GiveawayService', () => {
   let giveawayService: GiveawayService;
@@ -18,10 +19,10 @@ describe('GiveawayService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [SecretConfigModule],
       providers: [
         GiveawayService,
         ProfileService,
-        SecretConfigService,
         {
           provide: getModelToken('Giveaway'),
           useValue: mockModel,

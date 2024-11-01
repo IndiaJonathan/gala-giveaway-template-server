@@ -3,7 +3,6 @@ import { Cron } from '@nestjs/schedule';
 import { GiveawayService } from './giveaway.service';
 import { ProfileService } from '../services/profile.service';
 import { SigningClient, TokenApi } from '@gala-chain/connect';
-import { SecretConfigService } from '../secrets/secrets.service';
 import { APP_SECRETS } from '../secrets/secrets.module';
 
 @Injectable()
