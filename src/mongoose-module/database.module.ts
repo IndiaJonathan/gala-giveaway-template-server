@@ -16,7 +16,6 @@ import { Module } from '@nestjs/common';
         return {
           uri: MONGO_URI,
           dbName: DB,
-          ssl: true,
         };
       },
     }),
