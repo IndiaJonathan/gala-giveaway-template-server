@@ -101,7 +101,6 @@ ProfileSchema.pre('save', async function (next) {
 });
 
 async function getEncryptionKey(encryptionKeyPartial: string) {
-
   if (!encryptionKeyPartial) throw new Error('Encryption key not set');
   // Derive a 32-byte key from the encryption key using scrypt
   const key = await new Promise<Buffer>((resolve, reject) => {
