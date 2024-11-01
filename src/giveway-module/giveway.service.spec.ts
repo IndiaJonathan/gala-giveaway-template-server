@@ -3,7 +3,6 @@ import { Types } from 'mongoose';
 import { GiveawayService } from './giveaway.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { ProfileService } from '../services/profile.service';
-import { SecretConfigService } from '../secrets/secrets.service';
 import BigNumber from 'bignumber.js';
 import { SecretConfigModule } from '../secrets/secrets.module';
 
