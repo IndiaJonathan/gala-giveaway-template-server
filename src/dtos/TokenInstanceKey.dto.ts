@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumberString, IsString } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 import { Transform } from 'class-transformer';
 import BigNumber from 'bignumber.js';
 

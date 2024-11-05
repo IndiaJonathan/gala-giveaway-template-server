@@ -132,7 +132,7 @@ export class GiveawayController {
       if (result.Status === 1) {
         //Good to go
         claimableWin.claimInfo = JSON.stringify(result);
-        const result2 = await this.giveawayService.sendWinnings(
+        await this.giveawayService.sendWinnings(
           claimableWin.giveaway.creator,
           claimableWin,
           claimableWin.giveaway,
