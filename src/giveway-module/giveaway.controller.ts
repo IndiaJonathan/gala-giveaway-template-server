@@ -106,16 +106,6 @@ export class GiveawayController {
     @Res() res: Response,
   ) {
     try {
-      // const publicKey = signatures.recoverPublicKey(
-      //   giveawayDto.signature,
-      //   giveawayDto,
-      //   '',
-      // );
-
-      // const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
-
-      // const account = await this.profileService.findProfileByGC(gc_address);
-
       const claimableWin = await this.giveawayService.getClaimableWin(
         giveawayDto.claimId,
       );
