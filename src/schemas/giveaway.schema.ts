@@ -1,4 +1,4 @@
-import { TokenClass } from '@gala-chain/api';
+import { TokenClassKeyProperties } from '@gala-chain/api';
 import { Schema, Document, ObjectId } from 'mongoose';
 import { MAX_ITERATIONS } from '../constant';
 
@@ -10,7 +10,7 @@ export interface Winner {
 export interface GiveawayDocument extends Document {
   endDateTime: Date;
   givewayType: string;
-  giveawayToken: TokenClass;
+  giveawayToken: TokenClassKeyProperties;
   tokenQuantity: string;
   winners: Winner[];
   winnerCount?: number;
@@ -19,6 +19,9 @@ export interface GiveawayDocument extends Document {
   creator: ObjectId;
   telegramAuthRequired: boolean;
   error: string;
+  requireBurnTokenToClaim: boolean;
+  burnTokenQuantity?: string;
+  burnToken?: TokenClassKeyProperties;
 }
 
 const WinnerSchema = new Schema<Winner>({
@@ -69,4 +72,23 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
   distributed: { type: Boolean, default: false },
 
   creator: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  requireBurnTokenToClaim: { type: Boolean, required: true },
+
+  burnTokenQuantity: {
+    type: String,
+    required: function (this: GiveawayDocument) {
+      return this.requireBurnTokenToClaim === true;
+    },
+  },
+  burnToken: {
+    type: new Schema({
+      collection: { type: String, required: true },
+      type: { type: String, required: true },
+      category: { type: String, required: true },
+      additionalKey: { type: String, required: true },
+    }),
+    required: function (this: GiveawayDocument) {
+      return this.requireBurnTokenToClaim === true;
+    },
+  },
 });

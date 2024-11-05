@@ -1,5 +1,12 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
-import { TokenApi, SigningClient, WalletUtils } from '@gala-chain/connect';
+import {
+  TokenApi,
+  SigningClient,
+  WalletUtils,
+  PresignedClient,
+  BurnTokensRequest,
+} from '@gala-chain/connect';
+
 import {
   createValidDTO,
   FetchAllowancesDto,
@@ -39,6 +46,12 @@ export class BabyOpsApi implements OnModuleInit {
       },
     );
     return tokenApi.FetchBalances(fetchBalances);
+  }
+
+  async burnToken(request: BurnTokensRequest) {
+    const presignedClient = new PresignedClient();
+    const tokenApi = new TokenApi(this.tokenApiEndpoint, presignedClient);
+    return tokenApi.BurnTokens(request);
   }
 
   async getTotalAllowanceQuantity(

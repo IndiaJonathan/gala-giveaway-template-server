@@ -6,6 +6,8 @@ import {
   Res,
   HttpStatus,
   UnauthorizedException,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { GiveawayDto } from '../dtos/giveaway.dto';
@@ -15,6 +17,7 @@ import { SignupGiveawayDto } from '../dtos/signup-giveaway.dto';
 import { BabyOpsApi } from '../services/baby-ops.service';
 import { ProfileService } from '../services/profile.service';
 import BigNumber from 'bignumber.js';
+import { BurnTokensRequestDto } from '../dtos/ClaimWin.dto';
 
 @Controller('api/giveaway')
 export class GiveawayController {
@@ -94,6 +97,53 @@ export class GiveawayController {
         message: 'Failed to retrieve giveaways',
         error,
       });
+    }
+  }
+
+  @Post('claim')
+  async claimWin(
+    @Body() giveawayDto: BurnTokensRequestDto,
+    @Res() res: Response,
+  ) {
+    try {
+      // const publicKey = signatures.recoverPublicKey(
+      //   giveawayDto.signature,
+      //   giveawayDto,
+      //   '',
+      // );
+
+      // const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
+
+      // const account = await this.profileService.findProfileByGC(gc_address);
+
+      const claimableWin = await this.giveawayService.getClaimableWin(
+        giveawayDto.claimId,
+      );
+      if (!claimableWin)
+        throw new NotFoundException(
+          `Cannot find claimable giveway with this id: ${giveawayDto.claimId}`,
+        );
+      if (claimableWin.claimed) {
+        throw new BadRequestException(`Giveaway already claimed`);
+      }
+
+      const result = await this.tokenService.burnToken(giveawayDto);
+      console.log(result);
+      if (result.Status === 1) {
+        //Good to go
+        claimableWin.claimInfo = JSON.stringify(result);
+        const result2 = await this.giveawayService.sendWinnings(
+          claimableWin.giveaway.creator,
+          claimableWin,
+          claimableWin.giveaway,
+        );
+      }
+      res.status(HttpStatus.OK).json({ success: true });
+    } catch (error) {
+      console.error(error);
+      res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ success: false, message: 'Failed to claim giveaway', error });
     }
   }
 

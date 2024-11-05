@@ -1,23 +1,33 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, ObjectId } from 'mongoose';
+import { Model, ObjectId, Types } from 'mongoose';
 import { GiveawayDocument, Winner } from '../schemas/giveaway.schema';
-import { signatures, TokenClassKey } from '@gala-chain/api';
+import { signatures, TokenClassKeyProperties } from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
 import BigNumber from 'bignumber.js';
 import { GiveawayDto } from '../dtos/giveaway.dto';
 import { MAX_ITERATIONS as MAX_WINNERS } from '../constant';
+import {
+  ClaimableWin,
+  ClaimableWinDocument,
+} from '../schemas/ClaimableWin.schema';
+import { APP_SECRETS } from '../secrets/secrets.module';
+import { SigningClient, TokenApi } from '@gala-chain/connect';
 
 @Injectable()
 export class GiveawayService {
   constructor(
     @InjectModel('Giveaway')
     private readonly giveawayModel: Model<GiveawayDocument>,
+    @InjectModel('ClaimableWin')
+    private readonly claimableWinModel: Model<ClaimableWinDocument>,
     private profileService: ProfileService,
+    @Inject(APP_SECRETS) private secrets: Record<string, any>,
   ) {}
 
   async createGiveaway(
@@ -35,6 +45,11 @@ export class GiveawayService {
       winnerCount: giveawayDto.winnerCount,
       telegramAuthRequired: giveawayDto.telegramAuthRequired,
       creator: account.id,
+      requireBurnTokenToClaim: giveawayDto.requireBurnTokenToClaim,
+      ...(giveawayDto.requireBurnTokenToClaim && {
+        burnTokenQuantity: giveawayDto.burnTokenQuantity,
+        burnToken: giveawayDto.burnToken,
+      }),
     });
     return await newGiveaway.save();
   }
@@ -45,10 +60,17 @@ export class GiveawayService {
 
   async findUndistributed(
     creator: ObjectId,
-    tokenClass: TokenClassKey,
+    tokenClass: TokenClassKeyProperties,
   ): Promise<GiveawayDocument[]> {
     return this.giveawayModel
-      .find({ creator, distributed: false, giveawayToken: tokenClass })
+      .find({
+        creator,
+        distributed: false,
+        'giveawayToken.collection': tokenClass.collection,
+        'giveawayToken.category': tokenClass.category,
+        'giveawayToken.type': tokenClass.type,
+        'giveawayToken.additionalKey': tokenClass.additionalKey,
+      })
       .exec();
   }
   async findReadyForDistribution(): Promise<GiveawayDocument[]> {
@@ -56,6 +78,87 @@ export class GiveawayService {
     return this.giveawayModel
       .find({ distributed: false, endDateTime: { $lt: currentDate } })
       .exec();
+  }
+
+  async getClaimableWin(claimableWinId: string) {
+    const claimableWin = await this.claimableWinModel
+      .findById(claimableWinId)
+      .populate('giveaway')
+      .exec();
+    return claimableWin;
+  }
+
+  async getClaimableWins(gcAddress: string) {
+    return this.claimableWinModel.aggregate([
+      {
+        $match: { gcAddress, claimed: { $ne: true } },
+      },
+      {
+        $lookup: {
+          from: 'giveaways',
+          localField: 'giveaway',
+          foreignField: '_id',
+          as: 'giveawayDetails',
+        },
+      },
+      {
+        $unwind: '$giveawayDetails',
+      },
+      {
+        $project: {
+          gcAddress: 1,
+          amountWon: 1,
+          giveawayToken: '$giveawayDetails.giveawayToken',
+          burnToken: '$giveawayDetails.burnToken',
+          burnTokenQuantity: '$giveawayDetails.burnTokenQuantity',
+        },
+      },
+    ]);
+  }
+
+  async createWinClaimsFromWinners(giveawayId: ObjectId, winners: Winner[]) {
+    const claimableWins = winners.map(
+      (winner) =>
+        new this.claimableWinModel({
+          giveaway: giveawayId,
+          amountWon: winner.winAmount,
+          gcAddress: winner.gcAddress,
+        }),
+    );
+    try {
+      await Promise.all(claimableWins.map((win) => win.save()));
+    } catch (error) {
+      console.error('Error saving claimable wins:', error);
+      throw error;
+    }
+  }
+
+  async sendWinnings(
+    creator: ObjectId,
+    claimableWin: ClaimableWinDocument,
+    giveaway: GiveawayDocument,
+  ) {
+    const tokenApiEndpoint = this.secrets['TOKEN_API_ENDPOINT'];
+    const encryptionKey = this.secrets['ENCRYPTION_KEY'];
+
+    const creatorProfile = await this.profileService.findProfile(creator);
+    const decryptedKey = await creatorProfile.decryptPrivateKey(encryptionKey);
+    const giveawayWalletSigner = new SigningClient(decryptedKey);
+    const tokenApi = new TokenApi(tokenApiEndpoint, giveawayWalletSigner);
+    const mintToken = await tokenApi.MintToken({
+      quantity: new BigNumber(claimableWin.amountWon),
+      tokenClass: giveaway.giveawayToken,
+      owner: claimableWin.gcAddress,
+    });
+    if (mintToken.Status === 1) {
+      claimableWin.claimed = true;
+      return await claimableWin.save();
+    } else {
+      console.error(
+        `Unable to mint, here is the dto: ${JSON.stringify(mintToken)}`,
+      );
+      return;
+    }
   }
 
   determineWinners(giveaway: GiveawayDocument): Winner[] {
@@ -122,6 +225,10 @@ export class GiveawayService {
 
     if (giveaway.usersSignedUp.includes(gcAddress)) {
       throw new BadRequestException(`You're already signed up!`);
+    }
+
+    if (giveaway.endDateTime && new Date(giveaway.endDateTime) < new Date()) {
+      throw new BadRequestException('The giveaway has ended, sorry');
     }
 
     if (giveaway.telegramAuthRequired) {
