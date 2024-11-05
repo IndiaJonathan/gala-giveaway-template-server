@@ -5,17 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, ObjectId, Types } from 'mongoose';
+import { Model, ObjectId } from 'mongoose';
 import { GiveawayDocument, Winner } from '../schemas/giveaway.schema';
 import { signatures, TokenClassKeyProperties } from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
 import BigNumber from 'bignumber.js';
 import { GiveawayDto } from '../dtos/giveaway.dto';
 import { MAX_ITERATIONS as MAX_WINNERS } from '../constant';
-import {
-  ClaimableWin,
-  ClaimableWinDocument,
-} from '../schemas/ClaimableWin.schema';
+import { ClaimableWinDocument } from '../schemas/ClaimableWin.schema';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import { SigningClient, TokenApi } from '@gala-chain/connect';
 

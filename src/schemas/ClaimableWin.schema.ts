@@ -1,5 +1,5 @@
-import { Document, Schema, model, Types } from 'mongoose';
-import { GiveawayDocument, GiveawaySchema } from './giveaway.schema';
+import { Document, Schema, model } from 'mongoose';
+import { GiveawayDocument } from './giveaway.schema';
 
 export interface ClaimableWinDocument extends Document {
   giveaway: GiveawayDocument;

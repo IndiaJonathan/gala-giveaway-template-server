@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsNotEmpty, IsNumberString, ValidateNested } from 'class-validator';
+import { IsNotEmpty, ValidateNested } from 'class-validator';
 import { TokenInstanceKeyDto } from './TokenInstanceKey.dto';
 import BigNumber from 'bignumber.js';
 
