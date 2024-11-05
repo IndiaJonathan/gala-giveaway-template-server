@@ -76,10 +76,14 @@ export class WalletController {
     @Body() tokenClass: any,
   ) {
     const userInfo = await this.profileService.findProfileByGC(gcAddress);
-    return this.tokenService.getTotalAllowanceQuantity(
+    const allowances = await this.tokenService.getTotalAllowanceQuantity(
       userInfo.giveawayWalletAddress,
       userInfo.id,
       tokenClass,
     );
+    return {
+      ...allowances,
+      giveawayWallet: userInfo.giveawayWalletAddress,
+    };
   }
 }

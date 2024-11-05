@@ -21,13 +21,15 @@ export class GivewayScheduler {
     }
 
     const tokenApiEndpoint = this.secrets['TOKEN_API_ENDPOINT'];
+    const encryptionKey = this.secrets['ENCRYPTION_KEY'];
 
     for (let index = 0; index < giveaways.length; index++) {
       const giveaway = giveaways[index];
       const creatorProfile = await this.profileService.findProfile(
         giveaway.creator,
       );
-      const decryptedKey = await creatorProfile.decryptPrivateKey();
+      const decryptedKey =
+        await creatorProfile.decryptPrivateKey(encryptionKey);
       const giveawayWalletSigner = new SigningClient(decryptedKey);
       const tokenApi = new TokenApi(tokenApiEndpoint, giveawayWalletSigner);
 
@@ -51,18 +53,29 @@ export class GivewayScheduler {
           quantity: winner.winAmount,
           tokenClass: giveaway.giveawayToken,
         }));
-        const mintResult = await tokenApi.BatchMintToken({
-          mintDtos: mappedWinners as any,
-        });
-        if (mintResult.Status === 1) {
-          giveaway.distributed = true;
-          console.log(`Giveway done!`);
-        } else {
-          giveaway.error = (mintResult as any).message;
-          console.log(
-            `Giveaway had errors, will retry later. Error: ${giveaway.error}`,
+        if (giveaway.requireBurnTokenToClaim) {
+          await this.giveawayService.createWinClaimsFromWinners(
+            giveaway.id,
+            winners,
           );
+          giveaway.distributed = true;
           await giveaway.save();
+          console.log(`Burn Giveaway done!`);
+        } else {
+          //Mint directly
+          const mintResult = await tokenApi.BatchMintToken({
+            mintDtos: mappedWinners as any,
+          });
+          if (mintResult.Status === 1) {
+            giveaway.distributed = true;
+            console.log(`Giveway done!`);
+          } else {
+            giveaway.error = (mintResult as any).message;
+            console.log(
+              `Giveaway had errors, will retry later. Error: ${giveaway.error}`,
+            );
+            await giveaway.save();
+          }
         }
       } catch (e) {
         console.error(e);

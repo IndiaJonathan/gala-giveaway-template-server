@@ -11,7 +11,7 @@ export interface ProfileDocument extends Document {
   createdAt: Date;
   giveawayWalletAddress: string;
   giveawayWalletAddressPrivateKey: string;
-  decryptPrivateKey(): Promise<string>;
+  decryptPrivateKey(encryptionKey: string): Promise<string>;
 }
 
 export const ProfileSchema = new Schema<ProfileDocument>({

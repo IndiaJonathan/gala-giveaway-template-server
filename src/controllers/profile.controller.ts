@@ -14,17 +14,25 @@ import { signatures } from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
 import { LinkDto } from '../dtos/profile.dto';
 import { APP_SECRETS } from '../secrets/secrets.module';
+import { GiveawayService } from '../giveway-module/giveaway.service';
 
 @Controller('api/profile')
 export class ProfileController {
   constructor(
     private profileService: ProfileService,
+    private giveawayService: GiveawayService,
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
   ) {}
 
   @Get('info/:gcAddress')
   async getProfile(@Param('gcAddress') gcAddress) {
-    return this.profileService.getSafeUserByGC(gcAddress, true);
+    const profile = await this.profileService.getSafeUserByGC(gcAddress, true);
+    const claimableWins =
+      await this.giveawayService.getClaimableWins(gcAddress);
+    return {
+      ...profile,
+      claimableWins,
+    };
   }
 
   @Post('link-accounts')
