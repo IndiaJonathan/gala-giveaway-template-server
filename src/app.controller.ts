@@ -4,7 +4,7 @@ import { Controller, Get } from '@nestjs/common';
 export class AppController {
   constructor() {}
 
-  @Get('health')
+  @Get('api/health')
   healthCheck(): string {
     return 'Healthy';
   }
