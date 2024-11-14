@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
   NotFoundException,
   BadRequestException,
+  Headers,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { GiveawayDto } from '../dtos/giveaway.dto';
@@ -87,9 +88,17 @@ export class GiveawayController {
   }
 
   @Get('all')
-  async getAllGiveaways(@Res() res: Response) {
+  async getAllGiveaways(
+    @Res() res: Response,
+    @Headers('gc-address') gcAddress?: string,
+  ) {
     try {
-      const giveaways = await this.giveawayService.findAll();
+      const validGcAddress =
+        gcAddress &&
+        (gcAddress.startsWith('client') || gcAddress.startsWith('eth'));
+
+      if (!validGcAddress) throw new Error('Must have gc-address in header');
+      const giveaways = await this.giveawayService.getGiveaways(gcAddress);
       res.status(HttpStatus.OK).json(giveaways);
     } catch (error) {
       res.status(HttpStatus.BAD_REQUEST).json({
@@ -140,7 +149,7 @@ export class GiveawayController {
   @Get('active')
   async getActiveGiveaways(@Res() res: Response) {
     try {
-      const giveaways = await this.giveawayService.findAll();
+      const giveaways = await this.giveawayService.getAllActiveGiveaways();
       res.status(HttpStatus.OK).json(giveaways);
     } catch (error) {
       res.status(HttpStatus.BAD_REQUEST).json({

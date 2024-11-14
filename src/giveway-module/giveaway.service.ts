@@ -55,6 +55,35 @@ export class GiveawayService {
     return this.giveawayModel.find().exec();
   }
 
+  // Only returns relevant data to make the request smaller
+  async getGiveaways(gcAddress: string): Promise<any[]> {
+    const giveaways = await this.giveawayModel.find().lean().exec();
+
+    return giveaways.map((giveaway) => {
+      // Get the list of winner addresses
+      const winnerAddresses = giveaway.winners.map(
+        (winner: { gcAddress: string }) => winner.gcAddress,
+      );
+
+      // Determine if the gcAddress is in the list of winners
+      const isWinner = winnerAddresses.includes(gcAddress);
+
+      // Extract winnerCount
+      const { winnerCount } = giveaway;
+
+      // Remove the 'winners' field
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { winners, ...rest } = giveaway;
+
+      // Return the modified giveaway object
+      return {
+        ...rest,
+        isWinner,
+        winnerCount,
+      };
+    });
+  }
+
   async findUndistributed(
     creator: ObjectId,
     tokenClass: TokenClassKeyProperties,
