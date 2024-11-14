@@ -66,30 +66,32 @@ export class BabyOpsApi implements OnModuleInit {
 
     let totalQuantity = BigNumber(0);
     let unusableQuantity = BigNumber(0);
-    ((allowances as any).Data.results as TokenAllowance[]).forEach(
-      (tokenAllowance) => {
-        const quantityAvailable = BigNumber(tokenAllowance.quantity).minus(
-          BigNumber(tokenAllowance.quantitySpent),
-        );
-        const usesAvailable = BigNumber(tokenAllowance.uses).minus(
-          BigNumber(tokenAllowance.usesSpent),
-        );
-
-        if (quantityAvailable < usesAvailable) {
-          //Handling it this way to ensure that the available quantity can work with available uses
-          const useableQuantity = quantityAvailable.minus(usesAvailable);
-          totalQuantity = totalQuantity.plus(useableQuantity);
-
-          unusableQuantity = unusableQuantity.plus(
-            quantityAvailable.minus(useableQuantity),
+    if ((allowances as any).Data) {
+      ((allowances as any).Data.results as TokenAllowance[]).forEach(
+        (tokenAllowance) => {
+          const quantityAvailable = BigNumber(tokenAllowance.quantity).minus(
+            BigNumber(tokenAllowance.quantitySpent),
+          );
+          const usesAvailable = BigNumber(tokenAllowance.uses).minus(
+            BigNumber(tokenAllowance.usesSpent),
           );
 
-          //TODO: Handle the full quantity if possible
-        } else {
-          totalQuantity = totalQuantity.plus(quantityAvailable);
-        }
-      },
-    );
+          if (quantityAvailable < usesAvailable) {
+            //Handling it this way to ensure that the available quantity can work with available uses
+            const useableQuantity = quantityAvailable.minus(usesAvailable);
+            totalQuantity = totalQuantity.plus(useableQuantity);
+
+            unusableQuantity = unusableQuantity.plus(
+              quantityAvailable.minus(useableQuantity),
+            );
+
+            //TODO: Handle the full quantity if possible
+          } else {
+            totalQuantity = totalQuantity.plus(quantityAvailable);
+          }
+        },
+      );
+    }
 
     const undistributedGiveways = await this.giveawayService.findUndistributed(
       ownerId,
