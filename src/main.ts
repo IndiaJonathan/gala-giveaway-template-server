@@ -12,6 +12,7 @@ async function bootstrap() {
       origin: '*',
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       credentials: true,
+      allowedHeaders: ['gc-address'],
     }),
   );
   await app.listen(PORT);
