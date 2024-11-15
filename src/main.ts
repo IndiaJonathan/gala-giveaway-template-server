@@ -12,7 +12,7 @@ async function bootstrap() {
       origin: '*',
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       credentials: true,
-      allowedHeaders: ['gc-address'],
+      allowedHeaders: ['gc-address', 'Content-Type', 'Authorization'],
     }),
   );
   await app.listen(PORT);
