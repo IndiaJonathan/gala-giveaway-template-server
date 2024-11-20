@@ -9,16 +9,18 @@ export interface Winner {
 
 export interface GiveawayDocument extends Document {
   endDateTime: Date;
-  givewayType: string;
+  giveawayType: 'FirstComeFirstServe' | 'DistributedGiveway';
   giveawayToken: TokenClassKeyProperties;
-  tokenQuantity: string;
-  winners: Winner[];
-  winnerCount?: number;
+  tokenQuantity?: string; // Optional for FCFS
+  winners?: Winner[]; // Optional for FCFS
+  winnerCount?: number; // Required for Random Giveaway
+  claimPerUser?: number; // Required for FCFS
+  claimers?: string[]; // Required for FCFS
   usersSignedUp: string[];
   distributed: boolean;
   creator: ObjectId;
   telegramAuthRequired: boolean;
-  error: string;
+  error?: string;
   requireBurnTokenToClaim: boolean;
   burnTokenQuantity?: string;
   burnToken?: TokenClassKeyProperties;
@@ -30,11 +32,10 @@ const WinnerSchema = new Schema<Winner>({
 });
 
 export const GiveawaySchema = new Schema<GiveawayDocument>({
-  givewayType: {
+  giveawayType: {
     type: String,
-    required: false,
-    enum: ['randomized_iterative_giveway'],
-    default: 'randomized_iterative_giveway',
+    required: true,
+    enum: ['FirstComeFirstServe', 'DistributedGiveway'],
   },
   endDateTime: { type: Date, required: true },
   telegramAuthRequired: { type: Boolean, required: false, default: false },
@@ -46,18 +47,46 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
   },
   error: { type: String, required: false },
 
-  tokenQuantity: { type: String, required: true },
-
-  winners: { type: [WinnerSchema], default: [] },
+  // For Random Giveaway
+  tokenQuantity: {
+    type: String,
+    required: function (this: GiveawayDocument) {
+      return this.giveawayType === 'DistributedGiveway';
+    },
+  },
+  winners: {
+    type: [WinnerSchema],
+    default: [],
+    required: function (this: GiveawayDocument) {
+      return this.giveawayType === 'DistributedGiveway';
+    },
+  },
   winnerCount: {
     type: Number,
-    required: false,
+    required: function (this: GiveawayDocument) {
+      return this.giveawayType === 'DistributedGiveway';
+    },
     max: MAX_ITERATIONS,
     validate: {
       validator: Number.isInteger,
       message: '{VALUE} is not an integer value',
     },
   },
+
+  claimPerUser: {
+    type: Number,
+    required: function (this: GiveawayDocument) {
+      return this.giveawayType === 'FirstComeFirstServe';
+    },
+  },
+  claimers: {
+    type: [String],
+    default: [],
+    required: function (this: GiveawayDocument) {
+      return this.giveawayType === 'FirstComeFirstServe';
+    },
+  },
+
   usersSignedUp: {
     type: [String],
     default: [],

@@ -35,19 +35,8 @@ export class GiveawayService {
 
     const account = await this.profileService.findProfileByGC(gc_address);
 
-    const newGiveaway = new this.giveawayModel({
-      endDateTime: new Date(giveawayDto.endDateTime),
-      giveawayToken: giveawayDto.giveawayToken,
-      tokenQuantity: giveawayDto.tokenQuantity,
-      winnerCount: giveawayDto.winnerCount,
-      telegramAuthRequired: giveawayDto.telegramAuthRequired,
-      creator: account.id,
-      requireBurnTokenToClaim: giveawayDto.requireBurnTokenToClaim,
-      ...(giveawayDto.requireBurnTokenToClaim && {
-        burnTokenQuantity: giveawayDto.burnTokenQuantity,
-        burnToken: giveawayDto.burnToken,
-      }),
-    });
+    const newGiveaway = new this.giveawayModel({...giveawayDto, c);
+
     return await newGiveaway.save();
   }
 

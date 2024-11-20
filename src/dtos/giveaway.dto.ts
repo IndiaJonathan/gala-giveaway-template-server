@@ -8,36 +8,29 @@ import {
   ValidateIf,
 } from 'class-validator';
 
-export class GiveawayDto {
+// Base DTO for shared properties
+export class BasicGiveawaySettingsDto {
   @IsNotEmpty()
   giveawayToken: any;
 
-  @IsNotEmpty()
-  @IsNumberString()
-  tokenQuantity: string;
-
-  @IsNotEmpty()
-  @IsBoolean()
-  telegramAuthRequired: boolean;
-
-  @IsNotEmpty()
-  @IsNumberString()
-  winnerCount: string;
-
-  @IsNotEmpty()
-  @IsString()
-  signature: string;
-
   @IsOptional()
-  @IsString()
   @Validate((value: string) => !isNaN(Date.parse(value)), {
-    message: 'endTime must be a valid ISO 8601 date string',
+    message: 'endDateTime must be a valid ISO 8601 date string',
   })
+  @IsString()
   endDateTime?: string;
 
   @IsOptional()
   @IsBoolean()
-  requireBurnTokenToClaim?: boolean;
+  telegramAuthRequired?: boolean;
+
+  @IsNotEmpty()
+  @IsBoolean()
+  requireBurnTokenToClaim: boolean;
+
+  @IsNotEmpty()
+  @IsString()
+  signature: string;
 
   @ValidateIf((o) => o.requireBurnTokenToClaim === true)
   @IsNotEmpty({
@@ -53,3 +46,35 @@ export class GiveawayDto {
   })
   burnToken?: any;
 }
+
+export class FirstComeFirstServeGiveawaySettingsDto extends BasicGiveawaySettingsDto {
+  @IsOptional()
+  @IsString()
+  claimers?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  claimPerUser?: string;
+
+  @IsNotEmpty()
+  @IsString()
+  giveawayType: 'FirstComeFirstServe';
+}
+
+export class RandomGiveawaySettingsDto extends BasicGiveawaySettingsDto {
+  @IsNotEmpty()
+  @IsNumberString()
+  winners: string;
+
+  @IsNotEmpty()
+  @IsNumberString()
+  tokenQuantity: string;
+
+  @IsNotEmpty()
+  @IsString()
+  giveawayType: 'DistributedGiveway';
+}
+
+export type GiveawayDto =
+  | FirstComeFirstServeGiveawaySettingsDto
+  | RandomGiveawaySettingsDto;

@@ -9,6 +9,8 @@ import {
   NotFoundException,
   BadRequestException,
   Headers,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { GiveawayDto } from '../dtos/giveaway.dto';
@@ -29,6 +31,7 @@ export class GiveawayController {
   ) {}
 
   @Post('start')
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   async startGiveaway(@Body() giveawayDto: GiveawayDto, @Res() res: Response) {
     try {
       const publicKey = signatures.recoverPublicKey(
@@ -47,14 +50,28 @@ export class GiveawayController {
         giveawayDto.giveawayToken,
       );
 
-      if (
-        BigNumber(availableTokens.totalQuantity).minus(
-          BigNumber(giveawayDto.tokenQuantity),
-        ) < BigNumber(0)
-      ) {
-        throw new UnauthorizedException(
-          'You need to grant more tokens before you can start this giveaway',
-        );
+      if (giveawayDto.giveawayType === 'DistributedGiveway') {
+        if (
+          BigNumber(availableTokens.totalQuantity).minus(
+            BigNumber(giveawayDto.tokenQuantity),
+          ) < BigNumber(0)
+        ) {
+          throw new UnauthorizedException(
+            'You need to grant more tokens before you can start this giveaway',
+          );
+        }
+      } else {
+        if (
+          BigNumber(availableTokens.totalQuantity).minus(
+            BigNumber(giveawayDto.claimPerUser).multipliedBy(
+              giveawayDto.claimers,
+            ),
+          ) < BigNumber(0)
+        ) {
+          throw new UnauthorizedException(
+            'You need to grant more tokens before you can start this giveaway',
+          );
+        }
       }
 
       const createdGiveaway = await this.giveawayService.createGiveaway(
