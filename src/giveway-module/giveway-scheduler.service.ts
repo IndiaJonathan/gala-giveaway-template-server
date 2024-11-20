@@ -36,6 +36,7 @@ export class GivewayScheduler {
       const decryptedKey =
         await creatorProfile.decryptPrivateKey(encryptionKey);
       const giveawayWalletSigner = new SigningClient(decryptedKey);
+      await this.profileService.checkAndRegisterProfile(decryptedKey);
       const tokenApi = new TokenApi(tokenApiEndpoint, giveawayWalletSigner);
 
       let winners = giveaway.winners;
@@ -89,7 +90,6 @@ export class GivewayScheduler {
             console.error(e);
           } else {
             const registrationURL = await this.secrets['REGISTRATION_ENDPOINT'];
-
             console.log(
               `Wallet not registered, attempting registration for wallet: eth|${user}`,
             );
