@@ -14,7 +14,12 @@ import { GiveawayDto } from '../dtos/giveaway.dto';
 import { MAX_ITERATIONS as MAX_WINNERS } from '../constant';
 import { ClaimableWinDocument } from '../schemas/ClaimableWin.schema';
 import { APP_SECRETS } from '../secrets/secrets.module';
-import { SigningClient, TokenApi } from '@gala-chain/connect';
+import {
+  GalaChainBaseApi,
+  PresignedClient,
+  SigningClient,
+  TokenApi,
+} from '@gala-chain/connect';
 
 @Injectable()
 export class GiveawayService {
@@ -53,6 +58,30 @@ export class GiveawayService {
 
   async findAll(): Promise<GiveawayDocument[]> {
     return this.giveawayModel.find().exec();
+  }
+
+  async getGiveawayEstimatedFee(
+    gcAddress: string,
+    tokenClass: TokenClassKeyProperties,
+  ) {
+    const creatorProfile = await this.profileService.findProfileByGC(gcAddress);
+    const tokenApiEndpoint = this.secrets['TOKEN_API_ENDPOINT'];
+    const signer = new PresignedClient();
+    const api = new GalaChainBaseApi(tokenApiEndpoint, signer);
+    const dryRunResult = await api.DryRun({
+      method: 'BatchMintToken',
+      callerPublicKey: creatorProfile.giveawayWalletPublicKey,
+      dto: {
+        mintDtos: [
+          {
+            owner: gcAddress,
+            quantity: '1',
+            tokenClass: { ...tokenClass, instance: 0 },
+          },
+        ],
+      } as any,
+    });
+    return dryRunResult;
   }
 
   // Only returns relevant data to make the request smaller

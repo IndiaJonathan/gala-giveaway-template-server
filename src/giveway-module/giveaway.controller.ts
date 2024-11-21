@@ -19,6 +19,7 @@ import { BabyOpsApi } from '../services/baby-ops.service';
 import { ProfileService } from '../services/profile.service';
 import BigNumber from 'bignumber.js';
 import { BurnTokensRequestDto } from '../dtos/ClaimWin.dto';
+import { GalaChainBaseApi } from '@gala-chain/connect';
 
 @Controller('api/giveaway')
 export class GiveawayController {
@@ -55,6 +56,18 @@ export class GiveawayController {
         throw new UnauthorizedException(
           'You need to grant more tokens before you can start this giveaway',
         );
+      }
+
+      const dryRunResult = await this.giveawayService.getGiveawayEstimatedFee(
+        gc_address,
+        giveawayDto.giveawayToken,
+      );
+
+      if (
+        dryRunResult.Status !== 1 ||
+        dryRunResult.Data.response.Status !== 1
+      ) {
+        throw dryRunResult;
       }
 
       const createdGiveaway = await this.giveawayService.createGiveaway(
