@@ -19,7 +19,6 @@ import { BabyOpsApi } from '../services/baby-ops.service';
 import { ProfileService } from '../services/profile.service';
 import BigNumber from 'bignumber.js';
 import { BurnTokensRequestDto } from '../dtos/ClaimWin.dto';
-import { GalaChainBaseApi } from '@gala-chain/connect';
 
 @Controller('api/giveaway')
 export class GiveawayController {
