@@ -13,6 +13,7 @@ import { BabyOpsApi } from '../services/baby-ops.service';
 import { Response } from 'express';
 import { ProfileService } from '../services/profile.service';
 import { APP_SECRETS } from '../secrets/secrets.module';
+import BigNumber from 'bignumber.js';
 
 @Controller('api/wallet')
 export class WalletController {
@@ -81,8 +82,24 @@ export class WalletController {
       userInfo.id,
       tokenClass,
     );
+    const balances = await this.tokenService.getBalancesForToken(
+      userInfo.giveawayWalletAddress,
+      {
+        additionalKey: 'none',
+        category: 'Unit',
+        collection: 'GALA',
+        type: 'none',
+      } as any,
+    );
+
+    //todo: account for locks
+    const balance = balances.Data.reduce((total, item) => {
+      return total.plus(item.quantity);
+    }, new BigNumber(0));
+
     return {
-      ...allowances,
+      allowances,
+      balances: balance,
       giveawayWallet: userInfo.giveawayWalletAddress,
     };
   }

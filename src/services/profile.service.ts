@@ -71,6 +71,7 @@ export class ProfileService {
       galaChainAddress: galaChainAddress,
       giveawayWalletAddress: giveawayWalletAddress.galachainAddress,
       giveawayWalletAddressPrivateKey: giveawayWalletAddress.privateKey,
+      giveawayWalletPublicKey: giveawayWalletAddress.publicKey,
     });
 
     try {

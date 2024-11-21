@@ -107,6 +107,22 @@ export class BabyOpsApi implements OnModuleInit {
     return { totalQuantity, unusableQuantity };
   }
 
+  async getBalancesForToken(
+    ownerAddress: string,
+    tokenClassKey: TokenClassKey,
+  ) {
+    const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
+    const fetchAllowanceDto = await createValidDTO<FetchBalancesDto>(
+      FetchBalancesDto,
+      {
+        ...tokenClassKey,
+        owner: ownerAddress,
+      },
+    );
+    const balances = await tokenApi.FetchBalances(fetchAllowanceDto);
+    return balances;
+  }
+
   async getAllowancesForToken(
     ownerAddress: string,
     tokenClassKey: TokenClassKey,
