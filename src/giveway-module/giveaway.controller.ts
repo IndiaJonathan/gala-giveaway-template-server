@@ -58,16 +58,47 @@ export class GiveawayController {
         );
       }
 
-      const dryRunResult = await this.giveawayService.getGiveawayEstimatedFee(
-        gc_address,
-        giveawayDto.giveawayToken,
+      //todo: ADD this back
+
+      // const dryRunResult = await this.giveawayService.getGiveawayEstimatedFee(
+      //   gc_address,
+      //   giveawayDto.giveawayToken,
+      // );
+
+      // if (
+      //   dryRunResult.Status !== 1 ||
+      //   dryRunResult.Data.response.Status !== 1
+      // ) {
+      //   throw dryRunResult;
+      // }
+
+      // if (
+      //   dryRunResult.Status !== 1 ||
+      //   dryRunResult.Data.response.Status !== 1
+      // ) {
+      //   throw dryRunResult;
+      // }
+
+      const balances = await this.tokenService.getBalancesForToken(
+        account.giveawayWalletAddress,
+        {
+          additionalKey: 'none',
+          category: 'Unit',
+          collection: 'GALA',
+          type: 'none',
+        } as any,
       );
 
-      if (
-        dryRunResult.Status !== 1 ||
-        dryRunResult.Data.response.Status !== 1
-      ) {
-        throw dryRunResult;
+      //todo: account for locks
+      const galaBalance = balances.Data.reduce((total, item) => {
+        return total.plus(item.quantity);
+      }, new BigNumber(0));
+
+      //todo: unhardcode this from 1, use dry run
+      if (galaBalance.lt(1)) {
+        throw new BadRequestException(
+          'Insuffucient GALA balance in Giveway wallet, need 1',
+        );
       }
 
       const createdGiveaway = await this.giveawayService.createGiveaway(
