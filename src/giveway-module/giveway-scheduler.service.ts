@@ -2,7 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { GiveawayService } from './giveaway.service';
 import { ProfileService } from '../services/profile.service';
-import { SigningClient, TokenApi } from '@gala-chain/connect';
+import {
+  GalaChainResponseError,
+  SigningClient,
+  TokenApi,
+  WalletUtils,
+} from '@gala-chain/connect';
 import { APP_SECRETS } from '../secrets/secrets.module';
 
 @Injectable()
@@ -31,6 +36,7 @@ export class GivewayScheduler {
       const decryptedKey =
         await creatorProfile.decryptPrivateKey(encryptionKey);
       const giveawayWalletSigner = new SigningClient(decryptedKey);
+      await this.profileService.checkAndRegisterProfile(decryptedKey);
       const tokenApi = new TokenApi(tokenApiEndpoint, giveawayWalletSigner);
 
       let winners = giveaway.winners;
@@ -78,10 +84,37 @@ export class GivewayScheduler {
           }
         }
       } catch (e) {
-        console.error(e);
+        if (e instanceof GalaChainResponseError) {
+          const user = getUserFromMessage(e.Message);
+          if (!user) {
+            console.error(e);
+          } else {
+            const registrationURL = await this.secrets['REGISTRATION_ENDPOINT'];
+            console.log(
+              `Wallet not registered, attempting registration for wallet: eth|${user}`,
+            );
+            //Has user, attempt to register
+            const response = await WalletUtils.registerWallet(
+              registrationURL,
+              'eth|' + user,
+            );
+            console.log(`Response: ${response}`);
+          }
+        } else {
+          console.error(e);
+        }
       } finally {
         await giveaway.save();
       }
     }
   }
+}
+
+function getUserFromMessage(message: string) {
+  // Regex to match the specific message format and extract the user ID
+  const userRegex = /User (\w+) is not registered\./;
+  const match = message.match(userRegex);
+
+  // Return the extracted user ID if the message matches, otherwise null
+  return match ? match[1] : null;
 }

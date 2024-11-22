@@ -11,7 +11,12 @@ import { InjectModel } from '@nestjs/mongoose';
 import { ProfileDocument } from '../schemas/ProfileSchema';
 import { LinkDto } from '../dtos/profile.dto';
 import { MongoError } from 'mongodb';
-import { WalletUtils } from '@gala-chain/connect';
+import {
+  GalaChainResponseError,
+  PublicKeyApi,
+  SigningClient,
+  WalletUtils,
+} from '@gala-chain/connect';
 import { APP_SECRETS } from '../secrets/secrets.module';
 
 @Injectable()
@@ -66,6 +71,7 @@ export class ProfileService {
       galaChainAddress: galaChainAddress,
       giveawayWalletAddress: giveawayWalletAddress.galachainAddress,
       giveawayWalletAddressPrivateKey: giveawayWalletAddress.privateKey,
+      giveawayWalletPublicKey: giveawayWalletAddress.publicKey,
     });
 
     try {
@@ -148,5 +154,42 @@ export class ProfileService {
     }
 
     return updatedProfile;
+  }
+
+  async checkAndRegisterProfile(privateKey: string) {
+    const registrationEndpoint = await this.secrets['REGISTRATION_ENDPOINT'];
+    const publicKeyEndpoint = await this.secrets['PUBLIC_KEY_API_ENDPOINT'];
+
+    const client = new SigningClient(privateKey);
+    const publicKeyApi = new PublicKeyApi(publicKeyEndpoint, client);
+    const publicKey = await client.getPublicKey();
+
+    try {
+      const profile = await publicKeyApi.GetMyProfile();
+      if (profile.Data) {
+        //Good to go
+        return;
+        // console.log(`Profile found: ${profile.Data.alias}`);
+      } else {
+        const registerWallet = await WalletUtils.registerWallet(
+          registrationEndpoint,
+          publicKey.publicKey,
+        );
+        console.warn(registerWallet);
+      }
+    } catch (e) {
+      if (e instanceof GalaChainResponseError) {
+        if (e.ErrorCode === 400) {
+          //Not signed up, sign up
+          const registerWallet = await WalletUtils.registerWallet(
+            registrationEndpoint,
+            publicKey.publicKey,
+          );
+          console.warn(registerWallet);
+        }
+      } else {
+        console.error(e);
+      }
+    }
   }
 }

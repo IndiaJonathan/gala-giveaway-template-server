@@ -10,6 +10,7 @@ export interface ProfileDocument extends Document {
   lastName: string;
   createdAt: Date;
   giveawayWalletAddress: string;
+  giveawayWalletPublicKey: string;
   giveawayWalletAddressPrivateKey: string;
   decryptPrivateKey(encryptionKey: string): Promise<string>;
 }
@@ -49,6 +50,10 @@ export const ProfileSchema = new Schema<ProfileDocument>({
     default: Date.now,
   },
   giveawayWalletAddress: {
+    type: String,
+    required: true,
+  },
+  giveawayWalletPublicKey: {
     type: String,
     required: true,
   },
