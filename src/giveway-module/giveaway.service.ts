@@ -40,7 +40,10 @@ export class GiveawayService {
 
     const account = await this.profileService.findProfileByGC(gc_address);
 
-    const newGiveaway = new this.giveawayModel({...giveawayDto, c);
+    const newGiveaway = new this.giveawayModel({
+      ...giveawayDto,
+      creator: account,
+    });
 
     return await newGiveaway.save();
   }

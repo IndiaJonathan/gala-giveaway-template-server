@@ -64,7 +64,7 @@ export class GiveawayController {
         if (
           BigNumber(availableTokens.totalQuantity).minus(
             BigNumber(giveawayDto.claimPerUser).multipliedBy(
-              giveawayDto.claimers,
+              giveawayDto.maxWinners,
             ),
           ) < BigNumber(0)
         ) {

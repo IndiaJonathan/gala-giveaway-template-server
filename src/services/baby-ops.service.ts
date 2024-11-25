@@ -101,7 +101,15 @@ export class BabyOpsApi implements OnModuleInit {
     );
 
     undistributedGiveways.forEach((giveaway) => {
-      totalQuantity = BigNumber(totalQuantity).minus(giveaway.tokenQuantity);
+      switch (giveaway.giveawayType) {
+        case 'DistributedGiveway':
+          totalQuantity = BigNumber(totalQuantity).minus(
+            giveaway.tokenQuantity,
+          );
+          break;
+        case 'FirstComeFirstServe':
+          totalQuantity = BigNumber(totalQuantity).minus(giveaway.maxWinners);
+      }
     });
 
     return { totalQuantity, unusableQuantity };

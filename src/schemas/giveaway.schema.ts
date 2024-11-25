@@ -12,10 +12,10 @@ export interface GiveawayDocument extends Document {
   giveawayType: 'FirstComeFirstServe' | 'DistributedGiveway';
   giveawayToken: TokenClassKeyProperties;
   tokenQuantity?: string; // Optional for FCFS
-  winners?: Winner[]; // Optional for FCFS
+  winners: Winner[];
   winnerCount?: number; // Required for Random Giveaway
   claimPerUser?: number; // Required for FCFS
-  claimers?: string[]; // Required for FCFS
+  maxWinners: number;
   usersSignedUp: string[];
   distributed: boolean;
   creator: ObjectId;
@@ -57,9 +57,7 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
   winners: {
     type: [WinnerSchema],
     default: [],
-    required: function (this: GiveawayDocument) {
-      return this.giveawayType === 'DistributedGiveway';
-    },
+    required: true,
   },
   winnerCount: {
     type: Number,
@@ -79,12 +77,9 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
       return this.giveawayType === 'FirstComeFirstServe';
     },
   },
-  claimers: {
-    type: [String],
-    default: [],
-    required: function (this: GiveawayDocument) {
-      return this.giveawayType === 'FirstComeFirstServe';
-    },
+  maxWinners: {
+    type: Number,
+    required: true,
   },
 
   usersSignedUp: {

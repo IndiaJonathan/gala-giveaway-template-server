@@ -6,6 +6,7 @@ import {
   Validate,
   IsBoolean,
   ValidateIf,
+  IsNumber,
 } from 'class-validator';
 
 // Base DTO for shared properties
@@ -45,27 +46,27 @@ export class BasicGiveawaySettingsDto {
     message: 'burnToken is required when requireBurnTokenToClaim is true',
   })
   burnToken?: any;
+
+  @IsNumber()
+  @IsNotEmpty()
+  maxWinners?: number;
+
+  @IsNotEmpty()
+  @IsNumberString()
+  winners: string;
 }
 
 export class FirstComeFirstServeGiveawaySettingsDto extends BasicGiveawaySettingsDto {
-  @IsOptional()
-  @IsString()
-  claimers?: string;
-
-  @IsOptional()
   @IsNumberString()
+  @IsNotEmpty()
   claimPerUser?: string;
 
-  @IsNotEmpty()
   @IsString()
+  @IsNotEmpty()
   giveawayType: 'FirstComeFirstServe';
 }
 
 export class RandomGiveawaySettingsDto extends BasicGiveawaySettingsDto {
-  @IsNotEmpty()
-  @IsNumberString()
-  winners: string;
-
   @IsNotEmpty()
   @IsNumberString()
   tokenQuantity: string;
