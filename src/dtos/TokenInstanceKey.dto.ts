@@ -18,4 +18,5 @@ export class TokenInstanceKeyDto {
   @IsNotEmpty()
   @Transform(({ value }) => BigNumber(value))
   instance: BigNumber;
+
 }

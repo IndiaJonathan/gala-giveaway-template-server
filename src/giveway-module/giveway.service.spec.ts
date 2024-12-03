@@ -242,7 +242,7 @@ describe('GiveawayService', () => {
       },
       tokenQuantity: extremelyLargeNumber.toString(),
       winners: [],
-      winnerCount: 1,
+      maxWinners: 1,
       usersSignedUp: ['user1', 'user2', 'user3', 'user4'],
       distributed: false,
       creator: new Types.ObjectId(),

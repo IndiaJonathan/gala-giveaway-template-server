@@ -14,11 +14,13 @@ import { Response } from 'express';
 import { ProfileService } from '../services/profile.service';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import BigNumber from 'bignumber.js';
+import { GiveawayService } from '../giveway-module/giveaway.service';
 
 @Controller('api/wallet')
 export class WalletController {
   constructor(
     private tokenService: BabyOpsApi,
+    private giveawayService: GiveawayService,
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
     private profileService: ProfileService,
   ) {}
@@ -77,12 +79,12 @@ export class WalletController {
     @Body() tokenClass: any,
   ) {
     const userInfo = await this.profileService.findProfileByGC(gcAddress);
-    const allowances = await this.tokenService.getTotalAllowanceQuantity(
+    const allowances = await this.giveawayService.getTotalAllowanceQuantity(
       userInfo.giveawayWalletAddress,
       userInfo.id,
       tokenClass,
     );
-    const balances = await this.tokenService.getBalancesForToken(
+    const galaBalance = await this.tokenService.getBalancesForToken(
       userInfo.giveawayWalletAddress,
       {
         additionalKey: 'none',
@@ -93,14 +95,18 @@ export class WalletController {
     );
 
     //todo: account for locks
-    const balance = balances.Data.reduce((total, item) => {
+    const balance = galaBalance.Data.reduce((total, item) => {
       return total.plus(item.quantity);
     }, new BigNumber(0));
+
+    const currentGalaFeesNeeded =
+      await this.giveawayService.getTotalGalaFeesRequired(userInfo.id);
 
     return {
       allowances,
       balances: balance,
       giveawayWallet: userInfo.giveawayWalletAddress,
+      currentGalaFeesNeeded,
     };
   }
 }

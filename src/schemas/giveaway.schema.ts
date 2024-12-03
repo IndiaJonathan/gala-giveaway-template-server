@@ -1,6 +1,6 @@
 import { TokenClassKeyProperties } from '@gala-chain/api';
-import { Schema, Document, ObjectId } from 'mongoose';
-import { MAX_ITERATIONS } from '../constant';
+import { Schema, Document } from 'mongoose';
+import { ObjectId } from 'mongodb';
 
 export interface Winner {
   gcAddress: string;
@@ -13,11 +13,10 @@ export interface GiveawayDocument extends Document {
   giveawayToken: TokenClassKeyProperties;
   tokenQuantity?: string; // Optional for FCFS
   winners: Winner[];
-  winnerCount?: number; // Required for Random Giveaway
   claimPerUser?: number; // Required for FCFS
   maxWinners: number;
-  usersSignedUp: string[];
-  distributed: boolean;
+  usersSignedUp?: string[]; //Required for distributed giveaway
+  distributed?: boolean; //distributed only
   creator: ObjectId;
   telegramAuthRequired: boolean;
   error?: string;
@@ -59,18 +58,6 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
     default: [],
     required: true,
   },
-  winnerCount: {
-    type: Number,
-    required: function (this: GiveawayDocument) {
-      return this.giveawayType === 'DistributedGiveway';
-    },
-    max: MAX_ITERATIONS,
-    validate: {
-      validator: Number.isInteger,
-      message: '{VALUE} is not an integer value',
-    },
-  },
-
   claimPerUser: {
     type: Number,
     required: function (this: GiveawayDocument) {
@@ -84,7 +71,9 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
 
   usersSignedUp: {
     type: [String],
-    default: [],
+    default: function () {
+      return this.giveawayType === 'DistributedGiveway' ? [] : undefined;
+    },
     validate: {
       validator: function (values: string[]) {
         return values.every((value) => value.startsWith('eth|'));
@@ -92,8 +81,16 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
       message: (props) =>
         `${props.value} is invalid. The address must start with "eth|".`,
     },
+    required: function (this: GiveawayDocument) {
+      return this.giveawayType === 'DistributedGiveway';
+    },
   },
-  distributed: { type: Boolean, default: false },
+  distributed: {
+    type: Boolean,
+    default: function () {
+      return this.giveawayType === 'DistributedGiveway' ? false : undefined;
+    },
+  },
 
   creator: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   requireBurnTokenToClaim: { type: Boolean, required: true },

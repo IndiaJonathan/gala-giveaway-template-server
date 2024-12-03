@@ -10,11 +10,11 @@ import {
   ConflictException,
   Inject,
 } from '@nestjs/common';
-import { signatures } from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
 import { LinkDto } from '../dtos/profile.dto';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import { GiveawayService } from '../giveway-module/giveaway.service';
+import { SignatureService } from '../signature.service';
 
 @Controller('api/profile')
 export class ProfileController {
@@ -22,6 +22,7 @@ export class ProfileController {
     private profileService: ProfileService,
     private giveawayService: GiveawayService,
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
+    @Inject(SignatureService) private signatureService: SignatureService,
   ) {}
 
   @Get('info/:gcAddress')
@@ -46,14 +47,7 @@ export class ProfileController {
       );
     }
 
-    const publicKey = signatures.recoverPublicKey(
-      linkDto.signature,
-      linkDto,
-      '',
-    );
-
-    // Construct GalaChain address from the Ethereum public key
-    const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
+    const gc_address = this.signatureService.validateSignature(linkDto);
 
     // Validate if the GalaChain address matches
     if (gc_address !== linkDto['GalaChain Address']) {

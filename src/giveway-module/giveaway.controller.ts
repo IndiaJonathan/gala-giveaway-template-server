@@ -11,6 +11,7 @@ import {
   Headers,
   UsePipes,
   ValidationPipe,
+  Inject,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { GiveawayDto } from '../dtos/giveaway.dto';
@@ -21,6 +22,8 @@ import { BabyOpsApi } from '../services/baby-ops.service';
 import { ProfileService } from '../services/profile.service';
 import BigNumber from 'bignumber.js';
 import { BurnTokensRequestDto } from '../dtos/ClaimWin.dto';
+import { SignatureService } from '../signature.service';
+import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
 
 @Controller('api/giveaway')
 export class GiveawayController {
@@ -28,6 +31,7 @@ export class GiveawayController {
     private readonly giveawayService: GiveawayService,
     private tokenService: BabyOpsApi,
     private profileService: ProfileService,
+    @Inject(SignatureService) private signatureService: SignatureService,
   ) {}
 
   @Post('start')
@@ -44,11 +48,12 @@ export class GiveawayController {
 
       const account = await this.profileService.findProfileByGC(gc_address);
 
-      const availableTokens = await this.tokenService.getTotalAllowanceQuantity(
-        account.giveawayWalletAddress,
-        account.id,
-        giveawayDto.giveawayToken,
-      );
+      const availableTokens =
+        await this.giveawayService.getTotalAllowanceQuantity(
+          account.giveawayWalletAddress,
+          account.id,
+          giveawayDto.giveawayToken,
+        );
 
       if (giveawayDto.giveawayType === 'DistributedGiveway') {
         if (
@@ -110,10 +115,17 @@ export class GiveawayController {
         return total.plus(item.quantity);
       }, new BigNumber(0));
 
+      const extraAmount =
+        this.giveawayService.getRequiredGalaFeeForGiveaway(giveawayDto);
+
+      const currentRequirement =
+        await this.giveawayService.getTotalGalaFeesRequired(account.id);
+
+      const net = galaBalance.minus(extraAmount.plus(currentRequirement));
       //todo: unhardcode this from 1, use dry run
-      if (galaBalance.lt(1)) {
+      if (net.lt(0)) {
         throw new BadRequestException(
-          'Insuffucient GALA balance in Giveway wallet, need 1',
+          `Insuffucient GALA balance in Giveway wallet, need additional ${net.multipliedBy(-1)}`,
         );
       }
 
@@ -140,7 +152,7 @@ export class GiveawayController {
       '',
     );
     const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
-    const signupResult = await this.giveawayService.signupUser(
+    const signupResult = await this.giveawayService.signupUserForDistributed(
       signUpData.giveawayId,
       gc_address,
     );
@@ -169,7 +181,13 @@ export class GiveawayController {
     }
   }
 
-  @Post('claim')
+  @Post('fcfs/claim')
+  async claimFCFS(@Body() giveawayDto: ClaimFCFSRequestDTO) {
+    const gc_address = this.signatureService.validateSignature(giveawayDto);
+    return this.giveawayService.claimFCFS(giveawayDto, gc_address);
+  }
+
+  @Post('randomgiveaway/claim')
   async claimWin(
     @Body() giveawayDto: BurnTokensRequestDto,
     @Res() res: Response,
@@ -178,7 +196,9 @@ export class GiveawayController {
       const claimableWin = await this.giveawayService.getClaimableWin(
         giveawayDto.claimId,
       );
+
       if (!claimableWin)
+        // const gc_address = 'eth|' + signatures.getEthAddress();
         throw new NotFoundException(
           `Cannot find claimable giveway with this id: ${giveawayDto.claimId}`,
         );
@@ -186,16 +206,35 @@ export class GiveawayController {
         throw new BadRequestException(`Giveaway already claimed`);
       }
 
+      const gc_address = this.signatureService.validateSignature(giveawayDto);
+
+      const profile = await this.profileService.findProfileByGC(gc_address);
+
+      if (claimableWin.gcAddress !== profile.galaChainAddress) {
+        throw new BadRequestException(
+          'This GC address does not have an unclaimed win available',
+        );
+      }
+
       const result = await this.tokenService.burnToken(giveawayDto);
       console.log(result);
       if (result.Status === 1) {
         //Good to go
         claimableWin.claimInfo = JSON.stringify(result);
-        await this.giveawayService.sendWinnings(
-          claimableWin.giveaway.creator,
-          claimableWin,
+        const mintToken = await this.giveawayService.sendWinnings(
+          profile.id,
+          new BigNumber(claimableWin.amountWon),
           claimableWin.giveaway,
         );
+        if (mintToken.Status === 1) {
+          claimableWin.claimed = true;
+          return await claimableWin.save();
+        } else {
+          console.error(
+            `Unable to mint, here is the dto: ${JSON.stringify(mintToken)}`,
+          );
+          return;
+        }
       }
       res.status(HttpStatus.OK).json({ success: true });
     } catch (error) {
@@ -209,7 +248,7 @@ export class GiveawayController {
   @Get('active')
   async getActiveGiveaways(@Res() res: Response) {
     try {
-      const giveaways = await this.giveawayService.getAllActiveGiveaways();
+      const giveaways = await this.giveawayService.getGiveaways();
       res.status(HttpStatus.OK).json(giveaways);
     } catch (error) {
       res.status(HttpStatus.BAD_REQUEST).json({

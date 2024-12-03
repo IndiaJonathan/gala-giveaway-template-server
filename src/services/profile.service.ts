@@ -6,11 +6,11 @@ import {
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { omit } from 'lodash';
-import { Model, ObjectId } from 'mongoose';
+import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { ProfileDocument } from '../schemas/ProfileSchema';
 import { LinkDto } from '../dtos/profile.dto';
-import { MongoError } from 'mongodb';
+import { MongoError, ObjectId } from 'mongodb';
 import {
   GalaChainResponseError,
   PublicKeyApi,

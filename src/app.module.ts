@@ -10,12 +10,14 @@ import { SecretConfigModule } from './secrets/secrets.module';
 import { GiveawayModule } from './giveway-module/giveaway.module';
 import { DatabaseModule } from './mongoose-module/database.module';
 import { StartupService } from './services/startup';
+import { SignatureService } from './signature.service';
 
 @Module({
   imports: [GiveawayModule, SecretConfigModule, DatabaseModule],
   controllers: [AppController, WalletController, ProfileController],
   providers: [
     BabyOpsApi,
+    SignatureService,
     DatabaseService,
     GiveawayService,
     ProfileService,
