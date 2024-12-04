@@ -2,12 +2,18 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, ObjectId } from 'mongoose';
+import { Model } from 'mongoose';
 import { GiveawayDocument, Winner } from '../schemas/giveaway.schema';
-import { signatures, TokenClassKeyProperties } from '@gala-chain/api';
+import {
+  signatures,
+  TokenAllowance,
+  TokenClassKey,
+  TokenClassKeyProperties,
+} from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
 import BigNumber from 'bignumber.js';
 import { GiveawayDto } from '../dtos/giveaway.dto';
@@ -20,6 +26,12 @@ import {
   SigningClient,
   TokenApi,
 } from '@gala-chain/connect';
+import { ObjectId } from 'mongodb';
+import { checksumGCAddress, tokenToReadable } from '../chain.helper';
+import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
+import { BurnTokenQuantityDto } from '../dtos/BurnTokenQuantity.dto';
+import { BabyOpsApi } from '../services/baby-ops.service';
+import { PaymentStatusDocument } from '../schemas/PaymentStatusSchema';
 
 @Injectable()
 export class GiveawayService {
@@ -28,7 +40,10 @@ export class GiveawayService {
     private readonly giveawayModel: Model<GiveawayDocument>,
     @InjectModel('ClaimableWin')
     private readonly claimableWinModel: Model<ClaimableWinDocument>,
+    @InjectModel('PaymentStatus') // Inject the Mongoose model for Profile
+    private readonly paymentStatusModel: Model<PaymentStatusDocument>,
     private profileService: ProfileService,
+    @Inject(BabyOpsApi) private tokenService: BabyOpsApi,
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
   ) {}
 
@@ -41,18 +56,10 @@ export class GiveawayService {
     const account = await this.profileService.findProfileByGC(gc_address);
 
     const newGiveaway = new this.giveawayModel({
-      endDateTime: new Date(giveawayDto.endDateTime),
-      giveawayToken: giveawayDto.giveawayToken,
-      tokenQuantity: giveawayDto.tokenQuantity,
-      winnerCount: giveawayDto.winnerCount,
-      telegramAuthRequired: giveawayDto.telegramAuthRequired,
-      creator: account.id,
-      requireBurnTokenToClaim: giveawayDto.requireBurnTokenToClaim,
-      ...(giveawayDto.requireBurnTokenToClaim && {
-        burnTokenQuantity: giveawayDto.burnTokenQuantity,
-        burnToken: giveawayDto.burnToken,
-      }),
+      ...giveawayDto,
+      creator: account,
     });
+
     return await newGiveaway.save();
   }
 
@@ -84,8 +91,12 @@ export class GiveawayService {
     return dryRunResult;
   }
 
+  async getGiveaway(id: ObjectId) {
+    return this.giveawayModel.findById(id);
+  }
+
   // Only returns relevant data to make the request smaller
-  async getGiveaways(gcAddress: string): Promise<any[]> {
+  async getGiveaways(gcAddress?: string): Promise<any[]> {
     const giveaways = await this.giveawayModel.find().lean().exec();
 
     return giveaways.map((giveaway) => {
@@ -97,41 +108,53 @@ export class GiveawayService {
       // Determine if the gcAddress is in the list of winners
       const isWinner = winnerAddresses.includes(gcAddress);
 
-      // Extract winnerCount
-      const { winnerCount } = giveaway;
-
       // Remove the 'winners' field
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { winners, ...rest } = giveaway;
+
+      if (giveaway.giveawayType === 'FirstComeFirstServe') {
+        return {
+          ...rest,
+          isWinner,
+          claimsLeft: rest.maxWinners - winners.length,
+        };
+      }
 
       // Return the modified giveaway object
       return {
         ...rest,
         isWinner,
-        winnerCount,
       };
     });
   }
 
   async findUndistributed(
     creator: ObjectId,
-    tokenClass: TokenClassKeyProperties,
+    tokenClass?: TokenClassKeyProperties,
   ): Promise<GiveawayDocument[]> {
+    const currentDate = new Date();
+
     return this.giveawayModel
       .find({
         creator,
-        distributed: false,
-        'giveawayToken.collection': tokenClass.collection,
-        'giveawayToken.category': tokenClass.category,
-        'giveawayToken.type': tokenClass.type,
-        'giveawayToken.additionalKey': tokenClass.additionalKey,
+        $or: [{ distributed: false }, { endDateTime: { $gte: currentDate } }],
+        ...(tokenClass && {
+          'giveawayToken.collection': tokenClass.collection,
+          'giveawayToken.category': tokenClass.category,
+          'giveawayToken.type': tokenClass.type,
+          'giveawayToken.additionalKey': tokenClass.additionalKey,
+        }),
       })
       .exec();
   }
   async findReadyForDistribution(): Promise<GiveawayDocument[]> {
     const currentDate = new Date();
     return this.giveawayModel
-      .find({ distributed: false, endDateTime: { $lt: currentDate } })
+      .find({
+        distributed: false,
+        giveawayType: 'DistributedGiveway',
+        endDateTime: { $lt: currentDate },
+      })
       .exec();
   }
 
@@ -189,30 +212,29 @@ export class GiveawayService {
   }
 
   async sendWinnings(
-    creator: ObjectId,
-    claimableWin: ClaimableWinDocument,
+    winnerGCAddress: string,
+    amount: BigNumber,
     giveaway: GiveawayDocument,
   ) {
     const tokenApiEndpoint = this.secrets['TOKEN_API_ENDPOINT'];
     const encryptionKey = this.secrets['ENCRYPTION_KEY'];
 
-    const creatorProfile = await this.profileService.findProfile(creator);
+    const creatorProfile = await this.profileService.findProfile(
+      giveaway.creator,
+    );
     const decryptedKey = await creatorProfile.decryptPrivateKey(encryptionKey);
     const giveawayWalletSigner = new SigningClient(decryptedKey);
     const tokenApi = new TokenApi(tokenApiEndpoint, giveawayWalletSigner);
-    const mintToken = await tokenApi.MintToken({
-      quantity: new BigNumber(claimableWin.amountWon),
-      tokenClass: giveaway.giveawayToken,
-      owner: claimableWin.gcAddress,
-    });
-    if (mintToken.Status === 1) {
-      claimableWin.claimed = true;
-      return await claimableWin.save();
-    } else {
-      console.error(
-        `Unable to mint, here is the dto: ${JSON.stringify(mintToken)}`,
-      );
-      return;
+    try {
+      const mintToken = await tokenApi.MintToken({
+        quantity: amount,
+        tokenClass: giveaway.giveawayToken,
+        owner: winnerGCAddress,
+      });
+      return mintToken;
+    } catch (e) {
+      console.error(e);
+      throw e;
     }
   }
 
@@ -222,7 +244,7 @@ export class GiveawayService {
     const winnersMap: { [userId: string]: BigNumber } = {};
     const iterations = Math.min(
       MAX_WINNERS,
-      giveaway.winnerCount || MAX_WINNERS,
+      giveaway.maxWinners || MAX_WINNERS,
     );
 
     if (usersSignedUp.length === 0) {
@@ -267,7 +289,57 @@ export class GiveawayService {
     return winnersArray;
   }
 
-  async signupUser(giveawayId: string, gcAddress: string): Promise<any> {
+  async runGiveawayChecks(giveaway: GiveawayDocument, gcAddress: string) {
+    if (giveaway.endDateTime && new Date(giveaway.endDateTime) < new Date()) {
+      throw new BadRequestException('The giveaway has ended, sorry');
+    }
+
+    if (giveaway.telegramAuthRequired) {
+      const getProfile = await this.profileService.findProfileByGC(
+        checksumGCAddress(gcAddress),
+        true,
+      );
+      if (giveaway.telegramAuthRequired && !getProfile.telegramId) {
+        throw new BadRequestException(
+          'You must link your telegram account for this giveaway',
+        );
+      }
+    }
+
+    //All checks passed
+  }
+
+  runBurnChecks(giveaway: GiveawayDocument, burnDto: BurnTokenQuantityDto[]) {
+    if (giveaway.burnToken) {
+      //Has a burn associated
+      let burnQuantity = new BigNumber(0);
+      if (!burnDto) {
+        throw new BadRequestException('No burn, but this claim requires it');
+      }
+      burnDto.forEach((burn) => {
+        if (
+          tokenToReadable(burn.tokenInstanceKey) ===
+          tokenToReadable(giveaway.burnToken)
+        ) {
+          burnQuantity = burnQuantity.plus(burn.quantity);
+        } else {
+          throw new BadRequestException(
+            `Burn requires: ${tokenToReadable(giveaway.burnToken)}, but got: ${tokenToReadable(burn.tokenInstanceKey)}`,
+          );
+        }
+      });
+      if (!burnQuantity.eq(giveaway.burnTokenQuantity)) {
+        throw new BadRequestException(
+          `Burn requires amount of ${giveaway.burnTokenQuantity}, but got: ${burnQuantity}`,
+        );
+      }
+    }
+  }
+
+  async signupUserForDistributed(
+    giveawayId: string,
+    gcAddress: string,
+  ): Promise<any> {
     if (!gcAddress.startsWith('eth|'))
       throw new BadRequestException(
         'GC Address must start with eth|, any others are unsupported at the moment.',
@@ -278,25 +350,16 @@ export class GiveawayService {
       throw new NotFoundException('Giveaway not found');
     }
 
-    if (giveaway.usersSignedUp.includes(gcAddress)) {
+    if (giveaway.usersSignedUp.includes(checksumGCAddress(gcAddress))) {
       throw new BadRequestException(`You're already signed up!`);
     }
-
-    if (giveaway.endDateTime && new Date(giveaway.endDateTime) < new Date()) {
-      throw new BadRequestException('The giveaway has ended, sorry');
-    }
-
-    if (giveaway.telegramAuthRequired) {
-      const getProfile = await this.profileService.findProfileByGC(
-        gcAddress,
-        true,
+    if (giveaway.giveawayType !== 'DistributedGiveway') {
+      throw new BadRequestException(
+        'Giveaway is not of type DistributedGiveway',
       );
-      if (giveaway.telegramAuthRequired && !getProfile.telegramId) {
-        throw new BadRequestException(
-          'You must link your telegram account for this giveaway',
-        );
-      }
     }
+
+    await this.runGiveawayChecks(giveaway, gcAddress);
 
     giveaway.usersSignedUp.push(gcAddress);
     await giveaway.save();
@@ -306,12 +369,94 @@ export class GiveawayService {
     };
   }
 
-  async getAllActiveGiveaways(): Promise<GiveawayDocument[]> {
-    const currentDate = new Date();
-    return this.giveawayModel
-      .find({ endDateTime: { $gt: currentDate } })
+  async claimFCFS(
+    claimDto: ClaimFCFSRequestDTO,
+    gcAddress: string,
+  ): Promise<any> {
+    gcAddress = checksumGCAddress(gcAddress);
+    if (!gcAddress.startsWith('eth|'))
+      throw new BadRequestException(
+        'GC Address must start with eth|, any others are unsupported at the moment.',
+      );
+    const giveaway = await this.giveawayModel
+      .findById(claimDto.giveawayId)
       .exec();
+
+    if (!giveaway) {
+      throw new NotFoundException('Giveaway not found');
+    }
+    if (giveaway.giveawayType !== 'FirstComeFirstServe') {
+      throw new BadRequestException('Giveaway is not of type FCFS');
+    }
+
+    if (giveaway.maxWinners <= giveaway.winners.length) {
+      throw new BadRequestException('Already fully claimed, sorry!');
+    }
+
+    if (
+      giveaway.winners.filter(
+        (winner) =>
+          checksumGCAddress(winner.gcAddress) === checksumGCAddress(gcAddress),
+      ).length
+    ) {
+      throw new BadRequestException(`You've already claimed this!`);
+    }
+    if (!giveaway.claimPerUser)
+      throw new BadRequestException('Giveway lacks claim per user');
+
+    await this.runGiveawayChecks(giveaway, gcAddress);
+    const paymentStatus = new this.paymentStatusModel();
+    paymentStatus.gcAddress = gcAddress;
+    paymentStatus.giveaway = giveaway.id;
+
+    if (giveaway.burnToken) {
+      this.runBurnChecks(giveaway, claimDto.tokenInstances);
+
+      const result = await this.tokenService.burnToken(claimDto);
+      console.log(result);
+      if (result.Status !== 1) {
+        throw new BadRequestException(
+          `Burn request failed, cannot claim. Error: ${JSON.stringify(result)}`,
+        );
+      }
+
+      paymentStatus.burnInfo = JSON.stringify(paymentStatus);
+      await paymentStatus.save();
+    }
+    giveaway.winners.push({
+      gcAddress,
+      winAmount: giveaway.claimPerUser.toString(),
+    });
+    await giveaway.save();
+    const sendResult = await this.sendWinnings(
+      gcAddress,
+      new BigNumber(giveaway.claimPerUser),
+      giveaway,
+    );
+    paymentStatus.winningInfo = JSON.stringify(sendResult);
+    await paymentStatus.save();
+    if (sendResult.Status === 1) {
+      return sendResult;
+    } else {
+      throw new InternalServerErrorException(sendResult);
+    }
   }
+
+  // async getAllActiveGiveaways(): Promise<GiveawayDocument[]> {
+  //   const currentDate = new Date();
+  //   return this.giveawayModel
+  //     .find({ endDateTime: { $gt: currentDate } })
+  //     .exec();
+  // }
+
+  // async distributeClaim(
+  //   giveawayModel: GiveawayDocument,
+  // ): Promise<GiveawayDocument[]> {
+  //   giveawayModel.claimPerUser
+  //   return this.giveawayModel
+  //     .find({ endDateTime: { $gt: currentDate } })
+  //     .exec();
+  // }
 
   async validateGiveawayIsActive(giveawayId: string): Promise<void> {
     const currentDate = new Date();
@@ -328,5 +473,90 @@ export class GiveawayService {
         `Giveaway ${giveawayId} is not active or not found`,
       );
     }
+  }
+
+  getRequiredGalaFeeForGiveaway(giveaway: GiveawayDocument | GiveawayDto) {
+    switch (giveaway.giveawayType) {
+      case 'DistributedGiveway':
+        return BigNumber(1);
+      case 'FirstComeFirstServe':
+        //todo run dryrun
+        return BigNumber(
+          giveaway.maxWinners - (giveaway?.winners?.length || 0),
+        );
+    }
+  }
+
+  async getTotalGalaFeesRequired(ownerId: ObjectId) {
+    const undistributedGiveways = await this.findUndistributed(ownerId);
+    const totalGalaFee = undistributedGiveways.reduce(
+      (accumulator, giveaway) => {
+        const fee = new BigNumber(this.getRequiredGalaFeeForGiveaway(giveaway));
+        return accumulator.plus(fee);
+      },
+      new BigNumber(0),
+    );
+    return totalGalaFee;
+  }
+
+  async getTotalAllowanceQuantity(
+    giveawayWalletAddress: string,
+    ownerId: ObjectId,
+    tokenClassKey: TokenClassKey,
+  ) {
+    const allowances = await this.tokenService.getAllowancesForToken(
+      giveawayWalletAddress,
+      tokenClassKey,
+    );
+
+    let totalQuantity = BigNumber(0);
+    let unusableQuantity = BigNumber(0);
+    if ((allowances as any).Data) {
+      //Seems like local wants results, but stage/prod don't
+      //TODO: look into this
+      const allowanceData =
+        (allowances as any).Data?.results || allowances.Data;
+      (allowanceData as TokenAllowance[]).forEach((tokenAllowance) => {
+        const quantityAvailable = BigNumber(tokenAllowance.quantity).minus(
+          BigNumber(tokenAllowance.quantitySpent),
+        );
+        const usesAvailable = BigNumber(tokenAllowance.uses).minus(
+          BigNumber(tokenAllowance.usesSpent),
+        );
+
+        if (quantityAvailable < usesAvailable) {
+          //Handling it this way to ensure that the available quantity can work with available uses
+          const useableQuantity = quantityAvailable.minus(usesAvailable);
+          totalQuantity = totalQuantity.plus(useableQuantity);
+
+          unusableQuantity = unusableQuantity.plus(
+            quantityAvailable.minus(useableQuantity),
+          );
+
+          //TODO: Handle the full quantity if possible
+        } else {
+          totalQuantity = totalQuantity.plus(quantityAvailable);
+        }
+      });
+    }
+
+    const undistributedGiveways = await this.findUndistributed(
+      ownerId,
+      tokenClassKey,
+    );
+
+    undistributedGiveways.forEach((giveaway) => {
+      switch (giveaway.giveawayType) {
+        case 'DistributedGiveway':
+          totalQuantity = BigNumber(totalQuantity).minus(
+            giveaway.tokenQuantity,
+          );
+          break;
+        case 'FirstComeFirstServe':
+          totalQuantity = BigNumber(totalQuantity).minus(giveaway.maxWinners);
+      }
+    });
+
+    return { totalQuantity, unusableQuantity };
   }
 }

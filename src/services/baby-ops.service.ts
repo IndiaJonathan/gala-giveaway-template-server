@@ -16,8 +16,8 @@ import {
 } from '@gala-chain/api';
 import BigNumber from 'bignumber.js';
 import { GiveawayService } from '../giveway-module/giveaway.service';
-import { ObjectId } from 'mongoose';
 import { APP_SECRETS } from '../secrets/secrets.module';
+import { ObjectId } from 'mongodb';
 
 @Injectable()
 export class BabyOpsApi implements OnModuleInit {
@@ -29,10 +29,7 @@ export class BabyOpsApi implements OnModuleInit {
     const privateKey = await this.secrets['GIVEAWAY_PRIVATE_KEY'];
     this.adminSigner = new SigningClient(privateKey);
   }
-  constructor(
-    private giveawayService: GiveawayService,
-    @Inject(APP_SECRETS) private secrets: Record<string, any>,
-  ) {}
+  constructor(@Inject(APP_SECRETS) private secrets: Record<string, any>) {}
   getGCAddress(address: string) {
     return address.replace('0x', 'eth|');
   }
@@ -52,59 +49,6 @@ export class BabyOpsApi implements OnModuleInit {
     const presignedClient = new PresignedClient();
     const tokenApi = new TokenApi(this.tokenApiEndpoint, presignedClient);
     return tokenApi.BurnTokens(request);
-  }
-
-  async getTotalAllowanceQuantity(
-    giveawayWalletAddress: string,
-    ownerId: ObjectId,
-    tokenClassKey: TokenClassKey,
-  ) {
-    const allowances = await this.getAllowancesForToken(
-      giveawayWalletAddress,
-      tokenClassKey,
-    );
-
-    let totalQuantity = BigNumber(0);
-    let unusableQuantity = BigNumber(0);
-    if ((allowances as any).Data) {
-      //Seems like local wants results, but stage/prod don't
-      //TODO: look into this
-      const allowanceData =
-        (allowances as any).Data?.results || allowances.Data;
-      (allowanceData as TokenAllowance[]).forEach((tokenAllowance) => {
-        const quantityAvailable = BigNumber(tokenAllowance.quantity).minus(
-          BigNumber(tokenAllowance.quantitySpent),
-        );
-        const usesAvailable = BigNumber(tokenAllowance.uses).minus(
-          BigNumber(tokenAllowance.usesSpent),
-        );
-
-        if (quantityAvailable < usesAvailable) {
-          //Handling it this way to ensure that the available quantity can work with available uses
-          const useableQuantity = quantityAvailable.minus(usesAvailable);
-          totalQuantity = totalQuantity.plus(useableQuantity);
-
-          unusableQuantity = unusableQuantity.plus(
-            quantityAvailable.minus(useableQuantity),
-          );
-
-          //TODO: Handle the full quantity if possible
-        } else {
-          totalQuantity = totalQuantity.plus(quantityAvailable);
-        }
-      });
-    }
-
-    const undistributedGiveways = await this.giveawayService.findUndistributed(
-      ownerId,
-      tokenClassKey,
-    );
-
-    undistributedGiveways.forEach((giveaway) => {
-      totalQuantity = BigNumber(totalQuantity).minus(giveaway.tokenQuantity);
-    });
-
-    return { totalQuantity, unusableQuantity };
   }
 
   async getBalancesForToken(

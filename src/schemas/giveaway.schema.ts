@@ -1,6 +1,6 @@
 import { TokenClassKeyProperties } from '@gala-chain/api';
-import { Schema, Document, ObjectId } from 'mongoose';
-import { MAX_ITERATIONS } from '../constant';
+import { Schema, Document } from 'mongoose';
+import { ObjectId } from 'mongodb';
 
 export interface Winner {
   gcAddress: string;
@@ -9,16 +9,17 @@ export interface Winner {
 
 export interface GiveawayDocument extends Document {
   endDateTime: Date;
-  givewayType: string;
+  giveawayType: 'FirstComeFirstServe' | 'DistributedGiveway';
   giveawayToken: TokenClassKeyProperties;
-  tokenQuantity: string;
+  tokenQuantity?: string; // Optional for FCFS
   winners: Winner[];
-  winnerCount?: number;
-  usersSignedUp: string[];
-  distributed: boolean;
+  claimPerUser?: number; // Required for FCFS
+  maxWinners: number;
+  usersSignedUp?: string[]; //Required for distributed giveaway
+  distributed?: boolean; //distributed only
   creator: ObjectId;
   telegramAuthRequired: boolean;
-  error: string;
+  error?: string;
   requireBurnTokenToClaim: boolean;
   burnTokenQuantity?: string;
   burnToken?: TokenClassKeyProperties;
@@ -30,11 +31,10 @@ const WinnerSchema = new Schema<Winner>({
 });
 
 export const GiveawaySchema = new Schema<GiveawayDocument>({
-  givewayType: {
+  giveawayType: {
     type: String,
-    required: false,
-    enum: ['randomized_iterative_giveway'],
-    default: 'randomized_iterative_giveway',
+    required: true,
+    enum: ['FirstComeFirstServe', 'DistributedGiveway'],
   },
   endDateTime: { type: Date, required: true },
   telegramAuthRequired: { type: Boolean, required: false, default: false },
@@ -46,21 +46,34 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
   },
   error: { type: String, required: false },
 
-  tokenQuantity: { type: String, required: true },
-
-  winners: { type: [WinnerSchema], default: [] },
-  winnerCount: {
-    type: Number,
-    required: false,
-    max: MAX_ITERATIONS,
-    validate: {
-      validator: Number.isInteger,
-      message: '{VALUE} is not an integer value',
+  // For Random Giveaway
+  tokenQuantity: {
+    type: String,
+    required: function (this: GiveawayDocument) {
+      return this.giveawayType === 'DistributedGiveway';
     },
   },
+  winners: {
+    type: [WinnerSchema],
+    default: [],
+    required: true,
+  },
+  claimPerUser: {
+    type: Number,
+    required: function (this: GiveawayDocument) {
+      return this.giveawayType === 'FirstComeFirstServe';
+    },
+  },
+  maxWinners: {
+    type: Number,
+    required: true,
+  },
+
   usersSignedUp: {
     type: [String],
-    default: [],
+    default: function () {
+      return this.giveawayType === 'DistributedGiveway' ? [] : undefined;
+    },
     validate: {
       validator: function (values: string[]) {
         return values.every((value) => value.startsWith('eth|'));
@@ -68,8 +81,16 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
       message: (props) =>
         `${props.value} is invalid. The address must start with "eth|".`,
     },
+    required: function (this: GiveawayDocument) {
+      return this.giveawayType === 'DistributedGiveway';
+    },
   },
-  distributed: { type: Boolean, default: false },
+  distributed: {
+    type: Boolean,
+    default: function () {
+      return this.giveawayType === 'DistributedGiveway' ? false : undefined;
+    },
+  },
 
   creator: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   requireBurnTokenToClaim: { type: Boolean, required: true },
