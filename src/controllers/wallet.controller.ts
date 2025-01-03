@@ -15,6 +15,7 @@ import { ProfileService } from '../services/profile.service';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import BigNumber from 'bignumber.js';
 import { GiveawayService } from '../giveway-module/giveaway.service';
+import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
 
 @Controller('api/wallet')
 export class WalletController {
@@ -76,7 +77,7 @@ export class WalletController {
   @Post('allowance-available/:gcAddress')
   async getAllowanceAvailable(
     @Param('gcAddress') gcAddress: string,
-    @Body() tokenClass: any,
+    @Body() tokenClass: TokenInstanceKeyDto,
   ) {
     const userInfo = await this.profileService.findProfileByGC(gcAddress);
     const allowances = await this.giveawayService.getTotalAllowanceQuantity(
@@ -84,18 +85,13 @@ export class WalletController {
       userInfo.id,
       tokenClass,
     );
-    const galaBalance = await this.tokenService.getBalancesForToken(
+    const galaBalances = await this.tokenService.getBalancesForToken(
       userInfo.giveawayWalletAddress,
-      {
-        additionalKey: 'none',
-        category: 'Unit',
-        collection: 'GALA',
-        type: 'none',
-      } as any,
+      tokenClass,
     );
 
     //todo: account for locks
-    const balance = galaBalance.Data.reduce((total, item) => {
+    const galaBalance = galaBalances.Data.reduce((total, item) => {
       return total.plus(item.quantity);
     }, new BigNumber(0));
 
@@ -103,8 +99,45 @@ export class WalletController {
       await this.giveawayService.getTotalGalaFeesRequired(userInfo.id);
 
     return {
+      detailsType: 'Allowance',
       allowances,
-      balances: balance,
+      galaBalance,
+      giveawayWallet: userInfo.giveawayWalletAddress,
+      currentGalaFeesNeeded,
+    };
+  }
+
+  @Post('balance-available/:gcAddress')
+  async getBalanceAvailable(
+    @Param('gcAddress') gcAddress: string,
+    @Body() tokenClass: TokenInstanceKeyDto,
+  ) {
+    const userInfo = await this.profileService.findProfileByGC(gcAddress);
+    const tokenBalances = await this.tokenService.getBalancesForToken(
+      userInfo.giveawayWalletAddress,
+      tokenClass,
+    );
+    const tokenBalance = tokenBalances.Data.reduce((total, item) => {
+      return total.plus(item.quantity);
+    }, new BigNumber(0));
+
+    const galaBalances = await this.tokenService.getBalancesForToken(
+      userInfo.giveawayWalletAddress,
+      tokenClass,
+    );
+
+    //todo: account for locks
+    const galaBalance = galaBalances.Data.reduce((total, item) => {
+      return total.plus(item.quantity);
+    }, new BigNumber(0));
+
+    const currentGalaFeesNeeded =
+      await this.giveawayService.getTotalGalaFeesRequired(userInfo.id);
+
+    return {
+      detailsType: 'Balance',
+      tokenBalance,
+      galaBalance,
       giveawayWallet: userInfo.giveawayWalletAddress,
       currentGalaFeesNeeded,
     };

@@ -11,13 +11,11 @@ import {
   createValidDTO,
   FetchAllowancesDto,
   FetchBalancesDto,
-  TokenAllowance,
   TokenClassKey,
+  TokenClassKeyProperties,
 } from '@gala-chain/api';
-import BigNumber from 'bignumber.js';
-import { GiveawayService } from '../giveway-module/giveaway.service';
 import { APP_SECRETS } from '../secrets/secrets.module';
-import { ObjectId } from 'mongodb';
+import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
 
 @Injectable()
 export class BabyOpsApi implements OnModuleInit {
@@ -53,7 +51,7 @@ export class BabyOpsApi implements OnModuleInit {
 
   async getBalancesForToken(
     ownerAddress: string,
-    tokenClassKey: TokenClassKey,
+    tokenClassKey: TokenInstanceKeyDto,
   ) {
     const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
     const fetchAllowanceDto = await createValidDTO<FetchBalancesDto>(
@@ -69,7 +67,7 @@ export class BabyOpsApi implements OnModuleInit {
 
   async getAllowancesForToken(
     ownerAddress: string,
-    tokenClassKey: TokenClassKey,
+    tokenClassKey: TokenClassKeyProperties,
   ) {
     const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
     const fetchAllowanceDto = await createValidDTO<FetchAllowancesDto>(

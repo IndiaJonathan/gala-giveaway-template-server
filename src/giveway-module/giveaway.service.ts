@@ -11,7 +11,6 @@ import { GiveawayDocument, Winner } from '../schemas/giveaway.schema';
 import {
   signatures,
   TokenAllowance,
-  TokenClassKey,
   TokenClassKeyProperties,
 } from '@gala-chain/api';
 import { ProfileService } from '../services/profile.service';
@@ -502,7 +501,7 @@ export class GiveawayService {
   async getTotalAllowanceQuantity(
     giveawayWalletAddress: string,
     ownerId: ObjectId,
-    tokenClassKey: TokenClassKey,
+    tokenClassKey: TokenClassKeyProperties,
   ) {
     const allowances = await this.tokenService.getAllowancesForToken(
       giveawayWalletAddress,

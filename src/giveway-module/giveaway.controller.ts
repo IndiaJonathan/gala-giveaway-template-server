@@ -216,13 +216,14 @@ export class GiveawayController {
         );
       }
 
+      //todo: handle if already burnt
       const result = await this.tokenService.burnToken(giveawayDto);
       console.log(result);
       if (result.Status === 1) {
         //Good to go
         claimableWin.claimInfo = JSON.stringify(result);
         const mintToken = await this.giveawayService.sendWinnings(
-          profile.id,
+          profile.galaChainAddress,
           new BigNumber(claimableWin.amountWon),
           claimableWin.giveaway,
         );
