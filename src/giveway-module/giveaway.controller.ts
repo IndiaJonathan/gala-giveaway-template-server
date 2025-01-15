@@ -48,6 +48,7 @@ export class GiveawayController {
 
       const account = await this.profileService.findProfileByGC(gc_address);
 
+      //TODO: Start from here next week and validate balances
       const availableTokens =
         await this.giveawayService.getTotalAllowanceQuantity(
           account.giveawayWalletAddress,

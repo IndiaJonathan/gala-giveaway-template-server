@@ -9,6 +9,7 @@ import {
   WalletUtils,
 } from '@gala-chain/connect';
 import { APP_SECRETS } from '../secrets/secrets.module';
+import { GiveawayStatus } from '../schemas/giveaway.schema';
 
 @Injectable()
 export class GivewayScheduler {
@@ -47,7 +48,7 @@ export class GivewayScheduler {
         console.log(`Determined ${giveaway.winners} winners`);
       }
       if (winners.length === 0) {
-        giveaway.distributed = true;
+        giveaway.giveawayStatus = GiveawayStatus.Cancelled;
         await giveaway.save();
         continue;
       } else {
@@ -64,7 +65,7 @@ export class GivewayScheduler {
             giveaway.id,
             winners,
           );
-          giveaway.distributed = true;
+          giveaway.giveawayStatus = GiveawayStatus.Completed;
           await giveaway.save();
           console.log(`Burn Giveaway done!`);
         } else {
@@ -73,18 +74,24 @@ export class GivewayScheduler {
             mintDtos: mappedWinners as any,
           });
           if (mintResult.Status === 1) {
-            giveaway.distributed = true;
+            giveaway.giveawayStatus = GiveawayStatus.Completed;
             console.log(`Giveway done!`);
           } else {
-            giveaway.error = (mintResult as any).message;
+            giveaway.giveawayErrors.push((mintResult as any).message);
             console.log(
-              `Giveaway had errors, will retry later. Error: ${giveaway.error}`,
+              `Giveaway had errors, will retry later. Error: ${(mintResult as any).message}`,
             );
             await giveaway.save();
           }
         }
       } catch (e) {
         if (e instanceof GalaChainResponseError) {
+          giveaway.giveawayErrors.push(JSON.stringify(e));
+          if (giveaway.giveawayErrors.length > 5) {
+            //5 or more errors, just call it
+            giveaway.giveawayStatus = GiveawayStatus.Errored;
+          }
+          await giveaway.save();
           const user = getUserFromMessage(e.Message);
           if (!user) {
             console.error(e);

@@ -7,8 +7,12 @@ import {
   IsBoolean,
   ValidateIf,
   IsNumber,
+  IsEnum,
 } from 'class-validator';
-
+export enum GiveawayTokenType {
+  BALANCE = 'Balance',
+  ALLOWANCE = 'Allowance',
+}
 // Base DTO for shared properties
 export class BasicGiveawaySettingsDto {
   @IsNotEmpty()
@@ -54,6 +58,12 @@ export class BasicGiveawaySettingsDto {
   @IsNotEmpty()
   @IsNumberString()
   winners: string;
+
+  @IsNotEmpty()
+  @IsEnum(GiveawayTokenType, {
+    message: 'GiveawayTokenType must be one of: Balance, Allowance',
+  })
+  giveawayTokenType: GiveawayTokenType;
 }
 
 export class FirstComeFirstServeGiveawaySettingsDto extends BasicGiveawaySettingsDto {

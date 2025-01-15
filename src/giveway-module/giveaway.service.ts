@@ -136,7 +136,7 @@ export class GiveawayService {
     return this.giveawayModel
       .find({
         creator,
-        $or: [{ distributed: false }, { endDateTime: { $gte: currentDate } }],
+        $or: [{ giveawayStatus: false }, { endDateTime: { $gte: currentDate } }],
         ...(tokenClass && {
           'giveawayToken.collection': tokenClass.collection,
           'giveawayToken.category': tokenClass.category,
@@ -150,7 +150,7 @@ export class GiveawayService {
     const currentDate = new Date();
     return this.giveawayModel
       .find({
-        distributed: false,
+        giveawayStatus: false,
         giveawayType: 'DistributedGiveway',
         endDateTime: { $lt: currentDate },
       })
