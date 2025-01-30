@@ -1,29 +1,17 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
-import {
-  TokenApi,
-  SigningClient,
-  WalletUtils,
-  PresignedClient,
-  BurnTokensRequest,
-} from '@gala-chain/connect';
+import { SigningClient, BurnTokensRequest } from '@gala-chain/connect';
 
-import {
-  createValidDTO,
-  FetchAllowancesDto,
-  FetchBalancesDto,
-  TokenClassKeyProperties,
-} from '@gala-chain/api';
+import { TokenClassKeyProperties } from '@gala-chain/api';
 import { APP_SECRETS } from '../../src/secrets/secrets.module';
 import { TokenInstanceKeyDto } from '../../src/dtos/TokenInstanceKey.dto';
-import { getAddress, computeAddress } from 'ethers';
+import { computeAddress } from 'ethers';
 
 @Injectable()
 export class MockGalachainApi implements OnModuleInit {
   private adminSigner: SigningClient;
   private registeredAddresses: Map<string, string> = new Map();
 
-  // Initialize the service and mock API endpoint
   async onModuleInit() {
     const privateKey = this.secrets['GIVEAWAY_PRIVATE_KEY'];
     this.adminSigner = new SigningClient(privateKey);
@@ -43,8 +31,6 @@ export class MockGalachainApi implements OnModuleInit {
               json: () => Promise.resolve({ data: 100 }),
               status: 200,
             });
-
-            //Add address to list here
           }
         },
       ) as jest.Mock,
@@ -53,14 +39,11 @@ export class MockGalachainApi implements OnModuleInit {
 
   constructor(@Inject(APP_SECRETS) private secrets: Record<string, any>) {}
 
-  // Mock address transformation
   getGCAddress(address: string) {
     return address.replace('0x', 'eth|');
   }
 
-  // Mock fetchBalances method for testing purposes
   async fetchBalances(ownerAddress: string) {
-    // Mock response similar to expected real response
     return {
       success: true,
       data: {
@@ -73,7 +56,6 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
-  // Mock burnToken method
   async burnToken(request: BurnTokensRequest) {
     return {
       success: true,
@@ -81,7 +63,6 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
-  // Mock getBalancesForToken method
   async getBalancesForToken(
     ownerAddress: string,
     tokenClassKey: TokenInstanceKeyDto,
@@ -90,7 +71,7 @@ export class MockGalachainApi implements OnModuleInit {
       success: true,
       data: {
         owner: ownerAddress,
-        balance: 150, // Mock balance for token
+        balance: 150,
       },
     };
   }
