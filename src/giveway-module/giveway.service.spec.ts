@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { GiveawayService } from './giveaway.service';
 import { getModelToken } from '@nestjs/mongoose';
-import { ProfileService } from '../services/profile.service';
+import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
 import { SecretConfigModule } from '../secrets/secrets.module';
 

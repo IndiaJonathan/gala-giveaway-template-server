@@ -1,6 +1,7 @@
 import { TokenClassKeyProperties } from '@gala-chain/api';
 import { Schema, Document } from 'mongoose';
 import { ObjectId } from 'mongodb';
+import { GiveawayTokenType } from '../dtos/giveaway.dto';
 
 export enum GiveawayStatus {
   Created = 'created',
@@ -31,6 +32,7 @@ export interface GiveawayDocument extends Document {
   requireBurnTokenToClaim: boolean;
   burnTokenQuantity?: string;
   burnToken?: TokenClassKeyProperties;
+  giveawayTokenType: GiveawayTokenType;
 }
 
 const WinnerSchema = new Schema<Winner>({
@@ -119,5 +121,11 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
     required: function (this: GiveawayDocument) {
       return this.requireBurnTokenToClaim === true;
     },
+  },
+
+  giveawayTokenType: {
+    type: String,
+    required: true,
+    enum: ['Balance', 'Allowance'],
   },
 });

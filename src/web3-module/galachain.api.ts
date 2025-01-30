@@ -11,14 +11,13 @@ import {
   createValidDTO,
   FetchAllowancesDto,
   FetchBalancesDto,
-  TokenClassKey,
   TokenClassKeyProperties,
 } from '@gala-chain/api';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
 
 @Injectable()
-export class BabyOpsApi implements OnModuleInit {
+export class GalachainApi implements OnModuleInit {
   private adminSigner: SigningClient;
   private tokenApiEndpoint: string;
 
@@ -91,6 +90,30 @@ export class BabyOpsApi implements OnModuleInit {
       },
     );
     return tokenApi.FetchAllowances(fetchAllowanceDto);
+  }
+
+  async isRegistered(address: string) {
+    const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
+    try {
+      const isRegisteredResponse: any = await tokenApi.GetObjectByKey({
+        objectId: `\u0000GCUP\u0000${address.replace('0x', '').replace('eth|', '').replace('client|', '')}\u0000`,
+      });
+
+      return {
+        exists: isRegisteredResponse.Status === 1,
+        alias: isRegisteredResponse.Data.alias,
+      };
+    } catch (e) {
+      if (e.Error) {
+        if (e.Error && e.Error.ErrorKey === 'OBJECT_NOT_FOUND') {
+          return {
+            exists: false,
+          };
+        }
+      }
+      console.error(e);
+      throw e;
+    }
   }
 
   async createRandomWallet(registrationEndpoint: string) {

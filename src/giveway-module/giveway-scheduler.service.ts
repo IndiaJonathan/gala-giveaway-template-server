@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { GiveawayService } from './giveaway.service';
-import { ProfileService } from '../services/profile.service';
+import { ProfileService } from '../profile-module/profile.service';
 import {
   GalaChainResponseError,
   SigningClient,

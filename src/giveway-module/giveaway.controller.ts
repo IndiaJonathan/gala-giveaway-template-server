@@ -12,24 +12,26 @@ import {
   UsePipes,
   ValidationPipe,
   Inject,
+  Param,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { GiveawayDto } from '../dtos/giveaway.dto';
 import { GiveawayService } from './giveaway.service';
 import { signatures } from '@gala-chain/api';
 import { SignupGiveawayDto } from '../dtos/signup-giveaway.dto';
-import { BabyOpsApi } from '../services/baby-ops.service';
-import { ProfileService } from '../services/profile.service';
+import { GalachainApi } from '../web3-module/galachain.api';
+import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
 import { BurnTokensRequestDto } from '../dtos/ClaimWin.dto';
 import { SignatureService } from '../signature.service';
 import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
+import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
 
 @Controller('api/giveaway')
 export class GiveawayController {
   constructor(
     private readonly giveawayService: GiveawayService,
-    private tokenService: BabyOpsApi,
+    private tokenService: GalachainApi,
     private profileService: ProfileService,
     @Inject(SignatureService) private signatureService: SignatureService,
   ) {}
@@ -48,9 +50,8 @@ export class GiveawayController {
 
       const account = await this.profileService.findProfileByGC(gc_address);
 
-      //TODO: Start from here next week and validate balances
       const availableTokens =
-        await this.giveawayService.getTotalAllowanceQuantity(
+        await this.giveawayService.getNetAllowanceQuantity(
           account.giveawayWalletAddress,
           account.id,
           giveawayDto.giveawayToken,
@@ -161,19 +162,15 @@ export class GiveawayController {
   }
 
   @Get('all')
-  async getAllGiveaways(
+  async getGiveaways(
     @Res() res: Response,
     @Headers('gc-address') gcAddress?: string,
   ) {
     try {
-      const validGcAddress =
-        gcAddress &&
-        (gcAddress.startsWith('client') || gcAddress.startsWith('eth'));
-
-      if (!validGcAddress) throw new Error('Must have gc-address in header');
       const giveaways = await this.giveawayService.getGiveaways(gcAddress);
       res.status(HttpStatus.OK).json(giveaways);
     } catch (error) {
+      console.error(error);
       res.status(HttpStatus.BAD_REQUEST).json({
         success: false,
         message: 'Failed to retrieve giveaways',
@@ -199,7 +196,6 @@ export class GiveawayController {
       );
 
       if (!claimableWin)
-        // const gc_address = 'eth|' + signatures.getEthAddress();
         throw new NotFoundException(
           `Cannot find claimable giveway with this id: ${giveawayDto.claimId}`,
         );
@@ -247,17 +243,72 @@ export class GiveawayController {
     }
   }
 
-  @Get('active')
-  async getActiveGiveaways(@Res() res: Response) {
-    try {
-      const giveaways = await this.giveawayService.getGiveaways();
-      res.status(HttpStatus.OK).json(giveaways);
-    } catch (error) {
-      res.status(HttpStatus.BAD_REQUEST).json({
-        success: false,
-        message: 'Failed to retrieve giveaways',
-        error,
-      });
-    }
+  @Post('allowance-available/:gcAddress')
+  async getAllowanceAvailable(
+    @Param('gcAddress') gcAddress: string,
+    @Body() tokenClass: TokenInstanceKeyDto,
+  ) {
+    const userInfo = await this.profileService.findProfileByGC(gcAddress);
+    const allowances = await this.giveawayService.getNetAllowanceQuantity(
+      userInfo.giveawayWalletAddress,
+      userInfo.id,
+      tokenClass,
+    );
+    const galaBalances = await this.tokenService.getBalancesForToken(
+      userInfo.giveawayWalletAddress,
+      tokenClass,
+    );
+
+    //todo: account for locks
+    const galaBalance = galaBalances.Data.reduce((total, item) => {
+      return total.plus(item.quantity);
+    }, new BigNumber(0));
+
+    const currentGalaFeesNeeded =
+      await this.giveawayService.getTotalGalaFeesRequired(userInfo.id);
+
+    return {
+      detailsType: 'Allowance',
+      allowances,
+      galaBalance,
+      giveawayWallet: userInfo.giveawayWalletAddress,
+      currentGalaFeesNeeded,
+    };
+  }
+
+  @Post('balance-available/:gcAddress')
+  async getBalanceAvailable(
+    @Param('gcAddress') gcAddress: string,
+    @Body() tokenClass: TokenInstanceKeyDto,
+  ) {
+    const userInfo = await this.profileService.findProfileByGC(gcAddress);
+    const tokenBalances = await this.tokenService.getBalancesForToken(
+      userInfo.giveawayWalletAddress,
+      tokenClass,
+    );
+    const tokenBalance = tokenBalances.Data.reduce((total, item) => {
+      return total.plus(item.quantity);
+    }, new BigNumber(0));
+
+    const galaBalances = await this.tokenService.getBalancesForToken(
+      userInfo.giveawayWalletAddress,
+      tokenClass,
+    );
+
+    //todo: account for locks
+    const galaBalance = galaBalances.Data.reduce((total, item) => {
+      return total.plus(item.quantity);
+    }, new BigNumber(0));
+
+    const currentGalaFeesNeeded =
+      await this.giveawayService.getTotalGalaFeesRequired(userInfo.id);
+
+    return {
+      detailsType: 'Balance',
+      tokenBalance,
+      galaBalance,
+      giveawayWallet: userInfo.giveawayWalletAddress,
+      currentGalaFeesNeeded,
+    };
   }
 }
