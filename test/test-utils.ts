@@ -4,6 +4,8 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import { APP_SECRETS } from '../src/secrets/secrets.module';
 import { SecretConfigService } from '../src/secrets/secrets.service';
 import { MONGO_CLIENT_PROVIDER } from './mocks/mongo.providers';
+import { MockGalachainApi } from './mocks/mock-galachain.api';
+import { GalachainApi } from '../src/web3-module/galachain.api';
 
 export const addDefaultMocks = async (module: TestingModuleBuilder) => {
   const memoryServer = await MongoMemoryServer.create();
@@ -16,7 +18,9 @@ export const addDefaultMocks = async (module: TestingModuleBuilder) => {
     .overrideProvider(APP_SECRETS)
     .useValue(secretsConfig)
     .overrideProvider(MONGO_CLIENT_PROVIDER)
-    .useValue(memoryServer);
+    .useValue(memoryServer)
+    .overrideProvider(GalachainApi)
+    .useClass(MockGalachainApi);
 
   return module;
 };
