@@ -132,6 +132,55 @@ describe('Giveaway Controller (e2e)', () => {
       .expect(400);
   });
 
+  it('should fail create a giveaway if time is not at least +1 hour', async () => {
+    const wallet = await WalletUtils.createAndRegisterRandomWallet(
+      secrets['REGISTRATION_ENDPOINT'],
+    );
+
+    const profile = await profileService.createProfile(wallet.ethAddress);
+
+    mockGalachainApi.grantAllowancesForToken(
+      profile.giveawayWalletAddress,
+      profile.galaChainAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    mockGalachainApi.grantBalanceForToken(
+      profile.giveawayWalletAddress,
+      GALA_TOKEN,
+      1,
+    );
+
+    const signer = new SigningClient(wallet.privateKey);
+    const signedPayload = await signer.sign('Start Giveaway', {
+      ...startAllowanceGiveaway,
+      endDateTime: new Date(), //Override Date
+    });
+
+    return await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(400)
+      .expect({
+        success: false,
+        message: 'Failed to start giveaway',
+        error: {
+          response: {
+            message: 'The endDateTime must be at least one hour in the future.',
+            error: 'Bad Request',
+            statusCode: 400,
+          },
+          status: 400,
+          options: {},
+          message: 'The endDateTime must be at least one hour in the future.',
+          name: 'BadRequestException',
+        },
+      })
+      .expect(400);
+  });
+
   it('should fail create a giveaway when gas balance is low', async () => {
     const wallet = await WalletUtils.createAndRegisterRandomWallet(
       secrets['REGISTRATION_ENDPOINT'],

@@ -47,6 +47,17 @@ export class GiveawayController {
         '',
       );
 
+      if (giveawayDto.endDateTime) {
+        const currentTime = new Date();
+        const oneHourFromNow = new Date(currentTime.getTime() + 60 * 60 * 1000);
+
+        if (new Date(giveawayDto.endDateTime) <= oneHourFromNow) {
+          throw new BadRequestException(
+            'The endDateTime must be at least one hour in the future.',
+          );
+        }
+      }
+
       const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
 
       const account = await this.profileService.findProfileByGC(gc_address);
