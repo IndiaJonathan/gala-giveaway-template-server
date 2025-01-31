@@ -23,10 +23,10 @@ import { GalachainApi } from '../web3-module/galachain.api';
 import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
 import { BurnTokensRequestDto } from '../dtos/ClaimWin.dto';
-import { SignatureService } from '../signature.service';
 import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
 import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
 import { ObjectId } from 'mongodb';
+import { validateSignature } from '../utils/web3wallet';
 
 @Controller('api/giveaway')
 export class GiveawayController {
@@ -34,7 +34,6 @@ export class GiveawayController {
     private readonly giveawayService: GiveawayService,
     private tokenService: GalachainApi,
     private profileService: ProfileService,
-    @Inject(SignatureService) private signatureService: SignatureService,
   ) {}
 
   @Post('start')
@@ -194,7 +193,7 @@ export class GiveawayController {
 
   @Post('fcfs/claim')
   async claimFCFS(@Body() giveawayDto: ClaimFCFSRequestDTO) {
-    const gc_address = this.signatureService.validateSignature(giveawayDto);
+    const gc_address = validateSignature(giveawayDto);
     return this.giveawayService.claimFCFS(giveawayDto, gc_address);
   }
 
@@ -216,7 +215,7 @@ export class GiveawayController {
         throw new BadRequestException(`Giveaway already claimed`);
       }
 
-      const gc_address = this.signatureService.validateSignature(giveawayDto);
+      const gc_address = validateSignature(giveawayDto);
 
       const profile = await this.profileService.findProfileByGC(gc_address);
 

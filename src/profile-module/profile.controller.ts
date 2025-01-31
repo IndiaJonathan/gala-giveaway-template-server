@@ -15,9 +15,9 @@ import { ProfileService } from './profile.service';
 import { LinkDto } from '../dtos/profile.dto';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import { GiveawayService } from '../giveway-module/giveaway.service';
-import { SignatureService } from '../signature.service';
 import { GalachainApi } from '../web3-module/galachain.api';
 import { isAddress } from 'ethers';
+import { validateSignature } from '../utils/web3wallet';
 
 @Controller('api/profile')
 export class ProfileController {
@@ -25,7 +25,6 @@ export class ProfileController {
     private profileService: ProfileService,
     private giveawayService: GiveawayService,
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
-    @Inject(SignatureService) private signatureService: SignatureService,
     @Inject(GalachainApi) private galachainApi: GalachainApi,
     private tokenService: GalachainApi,
   ) {}
@@ -67,7 +66,7 @@ export class ProfileController {
       );
     }
 
-    const gc_address = this.signatureService.validateSignature(linkDto);
+    const gc_address = validateSignature(linkDto);
 
     // Validate if the GalaChain address matches
     if (gc_address !== linkDto['GalaChain Address']) {

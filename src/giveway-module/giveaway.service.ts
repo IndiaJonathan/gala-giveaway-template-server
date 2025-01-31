@@ -32,7 +32,6 @@ import { BurnTokenQuantityDto } from '../dtos/BurnTokenQuantity.dto';
 import { GalachainApi } from '../web3-module/galachain.api';
 import { PaymentStatusDocument } from '../schemas/PaymentStatusSchema';
 import { WalletService } from '../web3-module/wallet.service';
-import { ProfileDocument } from '../schemas/ProfileSchema';
 
 @Injectable()
 export class GiveawayService {

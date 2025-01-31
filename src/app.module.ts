@@ -5,7 +5,6 @@ import { SecretConfigModule } from './secrets/secrets.module';
 import { GiveawayModule } from './giveway-module/giveaway.module';
 import { DatabaseModule } from './database-module/database.module';
 import { StartupService } from './services/startup';
-import { SignatureService } from './signature.service';
 import { GalaConnectApiService } from './web3-module/connect.api';
 import { ProfileModule } from './profile-module/profile.module';
 import { Web3Module } from './web3-module/web3.module';
@@ -19,11 +18,6 @@ import { Web3Module } from './web3-module/web3.module';
     Web3Module,
   ],
   controllers: [AppController],
-  providers: [
-    GalaConnectApiService,
-    GalachainApi,
-    SignatureService,
-    StartupService,
-  ],
+  providers: [GalaConnectApiService, GalachainApi, StartupService],
 })
 export class AppModule {}

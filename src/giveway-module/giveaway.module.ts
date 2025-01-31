@@ -6,7 +6,6 @@ import { GiveawayController } from './giveaway.controller';
 import { DatabaseModule } from '../database-module/database.module';
 import { ProfileService } from '../profile-module/profile.service';
 import { SecretConfigModule } from '../secrets/secrets.module';
-import { SignatureService } from '../signature.service';
 import { Web3Module } from '../web3-module/web3.module';
 
 @Module({
@@ -16,12 +15,7 @@ import { Web3Module } from '../web3-module/web3.module';
     SecretConfigModule,
     Web3Module,
   ],
-  providers: [
-    GiveawayService,
-    GivewayScheduler,
-    ProfileService,
-    SignatureService,
-  ],
+  providers: [GiveawayService, GivewayScheduler, ProfileService],
   controllers: [GiveawayController],
   exports: [GiveawayService],
 })

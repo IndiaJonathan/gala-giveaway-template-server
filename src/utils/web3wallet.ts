@@ -29,3 +29,9 @@ export const removePrefixes = (prefixedString: string) => {
     .replace('client|', '')
     .replace('0x', '');
 };
+
+export function validateSignature<T extends { signature: string }>(object: T) {
+  const publicKey = signatures.recoverPublicKey(object.signature, object, '');
+  const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
+  return gc_address;
+}
