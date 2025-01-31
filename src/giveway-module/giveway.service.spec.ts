@@ -5,6 +5,9 @@ import { getModelToken } from '@nestjs/mongoose';
 import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
 import { SecretConfigModule } from '../secrets/secrets.module';
+import { GalachainApi } from '../web3-module/galachain.api';
+import { MockGalachainApi } from '../../test/mocks/mock-galachain.api';
+import { WalletService } from '../web3-module/wallet.service';
 
 describe('GiveawayService', () => {
   let giveawayService: GiveawayService;
@@ -22,6 +25,8 @@ describe('GiveawayService', () => {
       providers: [
         GiveawayService,
         ProfileService,
+        GalachainApi,
+        WalletService,
         {
           provide: getModelToken('Giveaway'),
           useValue: mockModel,
@@ -34,8 +39,15 @@ describe('GiveawayService', () => {
           provide: getModelToken('Profile'),
           useValue: mockModel,
         },
+        {
+          provide: getModelToken('PaymentStatus'),
+          useValue: mockModel,
+        },
       ],
-    }).compile();
+    })
+      .overrideProvider(GalachainApi)
+      .useClass(MockGalachainApi)
+      .compile();
 
     giveawayService = module.get<GiveawayService>(GiveawayService);
   });
