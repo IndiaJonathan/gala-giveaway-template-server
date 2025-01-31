@@ -2,15 +2,30 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { SigningClient, BurnTokensRequest } from '@gala-chain/connect';
 
-import { TokenClassKeyProperties } from '@gala-chain/api';
+import { TokenBalance, TokenClassKeyProperties } from '@gala-chain/api';
 import { APP_SECRETS } from '../../src/secrets/secrets.module';
 import { TokenInstanceKeyDto } from '../../src/dtos/TokenInstanceKey.dto';
 import { computeAddress } from 'ethers';
+import { tokenToReadable } from '../../src/chain.helper';
+import BigNumber from 'bignumber.js';
 
 @Injectable()
 export class MockGalachainApi implements OnModuleInit {
   private adminSigner: SigningClient;
   private registeredAddresses: Map<string, string> = new Map();
+  private allowances: Map<
+    string,
+    Array<{
+      grantedTo: string;
+      grantedBy: string;
+      uses: number;
+      usesSpent: number;
+      quantity: number;
+      quantitySpent: number;
+      tokenClass: TokenClassKeyProperties;
+    }>
+  > = new Map();
+  private tokenBalances: Map<string, number> = new Map();
 
   async onModuleInit() {
     const privateKey = this.secrets['GIVEAWAY_PRIVATE_KEY'];
@@ -21,7 +36,6 @@ export class MockGalachainApi implements OnModuleInit {
         (url: string, data: { body: string; headers: any; method: string }) => {
           if (url === this.secrets['REGISTRATION_ENDPOINT']) {
             const parsedBody = JSON.parse(data.body);
-            const w3wPublicKey = parsedBody.publicKey;
             const ethAddress = computeAddress(parsedBody.publicKey);
             const gcAddress = ethAddress.replace('0x', 'eth|');
 
@@ -43,18 +57,18 @@ export class MockGalachainApi implements OnModuleInit {
     return address.replace('0x', 'eth|');
   }
 
-  async fetchBalances(ownerAddress: string) {
-    return {
-      success: true,
-      data: {
-        owner: ownerAddress,
-        balances: [
-          { tokenId: 'mock-token-1', amount: 100 },
-          { tokenId: 'mock-token-2', amount: 200 },
-        ],
-      },
-    };
-  }
+  //   async fetchBalances(ownerAddress: string) {
+  //     return {
+  //       success: true,
+  //       data: {
+  //         owner: ownerAddress,
+  //         balances: [
+  //           { tokenId: 'mock-token-1', amount: 100 },
+  //           { tokenId: 'mock-token-2', amount: 200 },
+  //         ],
+  //       },
+  //     };
+  //   }
 
   async burnToken(request: BurnTokensRequest) {
     return {
@@ -67,12 +81,18 @@ export class MockGalachainApi implements OnModuleInit {
     ownerAddress: string,
     tokenClassKey: TokenInstanceKeyDto,
   ) {
+    const amount = this.tokenBalances.get(
+      this.getBalanceKey(ownerAddress, tokenClassKey),
+    );
     return {
       success: true,
-      data: {
-        owner: ownerAddress,
-        balance: 150,
-      },
+      Data: [
+        {
+          ...tokenClassKey,
+          owner: ownerAddress,
+          quantity: amount || 0,
+        },
+      ],
     };
   }
 
@@ -82,26 +102,39 @@ export class MockGalachainApi implements OnModuleInit {
   ) {
     return {
       success: true,
-      data: {
-        allowances: [
-          { grantedTo: '0x123', amount: 50 },
-          { grantedTo: '0x456', amount: 100 },
-        ],
-      },
+      Data: this.allowances.get(ownerAddress) || [],
     };
   }
 
-  async fetchAllowances(ownerAddress: string) {
-    return {
-      success: true,
-      data: {
-        owner: ownerAddress,
-        allowances: [
-          { tokenId: 'mock-token-1', grantedTo: '0x123', amount: 50 },
-          { tokenId: 'mock-token-2', grantedTo: '0x456', amount: 100 },
-        ],
-      },
-    };
+  //TEST ONLY
+  grantAllowancesForToken(
+    grantedToGC: string,
+    grantedFromGC: string,
+    tokenClass: TokenClassKeyProperties,
+    amount: number,
+  ) {
+    if (!this.allowances.has(grantedToGC)) {
+      this.allowances.set(grantedToGC, []);
+    }
+
+    this.allowances.get(grantedToGC)?.push({
+      grantedBy: grantedFromGC,
+      grantedTo: grantedToGC,
+      quantity: amount,
+      uses: amount,
+      quantitySpent: 0,
+      usesSpent: 0,
+      tokenClass,
+    });
+  }
+
+  //TEST ONLY
+  grantBalanceForToken(
+    grantedToGC: string,
+    tokenClass: TokenClassKeyProperties,
+    amount: number,
+  ) {
+    this.tokenBalances.set(this.getBalanceKey(grantedToGC, tokenClass), amount);
   }
 
   async isRegistered(address: string) {
@@ -126,5 +159,9 @@ export class MockGalachainApi implements OnModuleInit {
         privateKey: 'mock-private-key',
       },
     };
+  }
+
+  getBalanceKey(grantedToGC: string, tokenClass: TokenClassKeyProperties) {
+    return grantedToGC + ':' + tokenToReadable(tokenClass);
   }
 }

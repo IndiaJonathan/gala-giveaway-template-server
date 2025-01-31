@@ -136,7 +136,7 @@ export class GiveawayController {
         giveawayDto,
       );
       res
-        .status(HttpStatus.OK)
+        .status(HttpStatus.CREATED)
         .json({ success: true, giveaway: createdGiveaway });
     } catch (error) {
       console.error(error);

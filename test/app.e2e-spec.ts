@@ -7,19 +7,18 @@ import { Web3Module } from '../src/web3-module/web3.module';
 import { MONGO_CLIENT_PROVIDER } from './mocks/mongo.providers';
 import request from 'supertest';
 import { ProfileService } from '../src/profile-module/profile.service';
-import {
-  PresignedClient,
-  SigningClient,
-  WalletUtils,
-  WebSigner,
-} from '@gala-chain/connect';
+import { SigningClient, WalletUtils } from '@gala-chain/connect';
 import { APP_SECRETS } from '../src/secrets/secrets.module';
+import { MockGalachainApi } from './mocks/mock-galachain.api';
+import { GalachainApi } from '../src/web3-module/galachain.api';
+import { GALA_TOKEN } from '../src/constant';
 
 jest.setTimeout(50000);
 describe('Giveaway Controller (e2e)', () => {
   let app: INestApplication;
   let memoryServer: MongoMemoryServer;
   let profileService: ProfileService;
+  let mockGalachainApi: MockGalachainApi;
   let secrets: Record<string, any>;
 
   beforeEach(async () => {
@@ -51,6 +50,7 @@ describe('Giveaway Controller (e2e)', () => {
     await app.init();
     memoryServer = app.get<MongoMemoryServer>(MONGO_CLIENT_PROVIDER);
     profileService = await app.resolve<ProfileService>(ProfileService);
+    mockGalachainApi = await app.resolve<MockGalachainApi>(GalachainApi);
     secrets = await app.resolve<Record<string, any>>(APP_SECRETS);
   });
 
@@ -107,6 +107,85 @@ describe('Giveaway Controller (e2e)', () => {
         },
       })
       .expect(400);
+  });
+
+  it('should fail create a giveaway when gas balance is low', async () => {
+    const wallet = await WalletUtils.createAndRegisterRandomWallet(
+      secrets['REGISTRATION_ENDPOINT'],
+    );
+
+    const profile = await profileService.createProfile(wallet.ethAddress);
+
+    mockGalachainApi.grantAllowancesForToken(
+      profile.giveawayWalletAddress,
+      profile.galaChainAddress,
+      {
+        additionalKey: 'none',
+        category: 'Unit',
+        collection: 'GALA',
+        type: 'none',
+      } as any,
+      50,
+    );
+
+    const signer = new SigningClient(wallet.privateKey);
+    const signedPayload = await signer.sign('Start Giveaway', startGiveaway);
+
+    return await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect({
+        success: false,
+        message: 'Failed to start giveaway',
+        error: {
+          response: {
+            message:
+              'Insuffucient GALA balance in Giveway wallet, need additional 1',
+            error: 'Bad Request',
+            statusCode: 400,
+          },
+          status: 400,
+          options: {},
+          message:
+            'Insuffucient GALA balance in Giveway wallet, need additional 1',
+          name: 'BadRequestException',
+        },
+      })
+      .expect(400);
+  });
+
+  it('should create a giveaway', async () => {
+    const wallet = await WalletUtils.createAndRegisterRandomWallet(
+      secrets['REGISTRATION_ENDPOINT'],
+    );
+
+    const profile = await profileService.createProfile(wallet.ethAddress);
+
+    mockGalachainApi.grantAllowancesForToken(
+      profile.giveawayWalletAddress,
+      profile.galaChainAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    mockGalachainApi.grantBalanceForToken(
+      profile.giveawayWalletAddress,
+      GALA_TOKEN,
+      1,
+    );
+
+    const signer = new SigningClient(wallet.privateKey);
+    const signedPayload = await signer.sign('Start Giveaway', startGiveaway);
+
+    return await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect((res) => {
+        expect(res.body).toMatchObject({ success: true });
+      })
+      .expect(201);
   });
 
   afterEach(async () => {
