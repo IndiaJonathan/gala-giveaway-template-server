@@ -2,12 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { GiveawayService } from './giveaway.service';
 import { ProfileService } from '../profile-module/profile.service';
-import {
-  GalaChainResponseError,
-  SigningClient,
-  TokenApi,
-  WalletUtils,
-} from '@gala-chain/connect';
+import { GalaChainResponseError, WalletUtils } from '@gala-chain/connect';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import { GiveawayStatus } from '../schemas/giveaway.schema';
 import { GalachainApi } from '../web3-module/galachain.api';
@@ -37,7 +32,6 @@ export class GivewayScheduler {
       );
       const decryptedKey =
         await creatorProfile.decryptPrivateKey(encryptionKey);
-      const giveawayWalletSigner = new SigningClient(decryptedKey);
       await this.profileService.checkAndRegisterProfile(decryptedKey);
 
       let winners = giveaway.winners;
