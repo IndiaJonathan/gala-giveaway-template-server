@@ -11,7 +11,6 @@ import {
   Headers,
   UsePipes,
   ValidationPipe,
-  Inject,
   Param,
 } from '@nestjs/common';
 import { Response } from 'express';
