@@ -1,8 +1,17 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
-import { SigningClient, BurnTokensRequest } from '@gala-chain/connect';
+import {
+  SigningClient,
+  BurnTokensRequest,
+  BatchMintTokenRequest,
+} from '@gala-chain/connect';
 
-import { TokenBalance, TokenClassKeyProperties } from '@gala-chain/api';
+import {
+  BatchMintTokenDto,
+  MintTokenDto,
+  TokenBalance,
+  TokenClassKeyProperties,
+} from '@gala-chain/api';
 import { APP_SECRETS } from '../../src/secrets/secrets.module';
 import { TokenInstanceKeyDto } from '../../src/dtos/TokenInstanceKey.dto';
 import { computeAddress } from 'ethers';
@@ -25,7 +34,7 @@ export class MockGalachainApi implements OnModuleInit {
       tokenClass: TokenClassKeyProperties;
     }>
   > = new Map();
-  private tokenBalances: Map<string, number> = new Map();
+  private tokenBalances: Map<string, { quantity: number }> = new Map();
 
   async onModuleInit() {
     const privateKey = this.secrets['GIVEAWAY_PRIVATE_KEY'];
@@ -57,18 +66,18 @@ export class MockGalachainApi implements OnModuleInit {
     return address.replace('0x', 'eth|');
   }
 
-  //   async fetchBalances(ownerAddress: string) {
-  //     return {
-  //       success: true,
-  //       data: {
-  //         owner: ownerAddress,
-  //         balances: [
-  //           { tokenId: 'mock-token-1', amount: 100 },
-  //           { tokenId: 'mock-token-2', amount: 200 },
-  //         ],
-  //       },
-  //     };
-  //   }
+  async fetchBalances(ownerAddress: string) {
+    const foundBalances = [];
+    for (const key of this.tokenBalances.keys()) {
+      if (key.includes(ownerAddress)) {
+        foundBalances.push(this.tokenBalances.get(key));
+      }
+    }
+    return {
+      success: true,
+      Data: foundBalances,
+    };
+  }
 
   async burnToken(request: BurnTokensRequest) {
     return {
@@ -134,7 +143,22 @@ export class MockGalachainApi implements OnModuleInit {
     tokenClass: TokenClassKeyProperties,
     amount: number,
   ) {
-    this.tokenBalances.set(this.getBalanceKey(grantedToGC, tokenClass), amount);
+    this.tokenBalances.set(this.getBalanceKey(grantedToGC, tokenClass), {
+      quantity: amount,
+    });
+  }
+
+  async batchMintToken(dto: BatchMintTokenRequest) {
+    (dto.mintDtos as unknown as MintTokenDto[]).forEach((mint) => {
+      this.grantBalanceForToken(
+        mint.owner,
+        mint.tokenClass,
+        Number(mint.quantity),
+      );
+    });
+    return {
+      Status: 1,
+    };
   }
 
   async isRegistered(address: string) {

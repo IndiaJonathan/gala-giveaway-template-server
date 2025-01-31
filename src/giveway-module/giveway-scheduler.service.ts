@@ -10,11 +10,13 @@ import {
 } from '@gala-chain/connect';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import { GiveawayStatus } from '../schemas/giveaway.schema';
+import { GalachainApi } from '../web3-module/galachain.api';
 
 @Injectable()
 export class GivewayScheduler {
   constructor(
     private giveawayService: GiveawayService,
+    private galachainApi: GalachainApi,
     private profileService: ProfileService,
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
   ) {}
@@ -26,7 +28,6 @@ export class GivewayScheduler {
       return;
     }
 
-    const tokenApiEndpoint = this.secrets['TOKEN_API_ENDPOINT'];
     const encryptionKey = this.secrets['ENCRYPTION_KEY'];
 
     for (let index = 0; index < giveaways.length; index++) {
@@ -38,7 +39,6 @@ export class GivewayScheduler {
         await creatorProfile.decryptPrivateKey(encryptionKey);
       const giveawayWalletSigner = new SigningClient(decryptedKey);
       await this.profileService.checkAndRegisterProfile(decryptedKey);
-      const tokenApi = new TokenApi(tokenApiEndpoint, giveawayWalletSigner);
 
       let winners = giveaway.winners;
       if (!giveaway.winners || !giveaway.winners.length) {
@@ -70,7 +70,7 @@ export class GivewayScheduler {
           console.log(`Burn Giveaway done!`);
         } else {
           //Mint directly
-          const mintResult = await tokenApi.BatchMintToken({
+          const mintResult = await this.galachainApi.batchMintToken({
             mintDtos: mappedWinners as any,
           });
           if (mintResult.Status === 1) {

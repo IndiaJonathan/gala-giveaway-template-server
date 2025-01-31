@@ -12,6 +12,14 @@ import { APP_SECRETS } from '../src/secrets/secrets.module';
 import { MockGalachainApi } from './mocks/mock-galachain.api';
 import { GalachainApi } from '../src/web3-module/galachain.api';
 import { GALA_TOKEN } from '../src/constant';
+import { GivewayScheduler } from '../src/giveway-module/giveway-scheduler.service';
+import {
+  GiveawayDocument,
+  GiveawayStatus,
+} from '../src/schemas/giveaway.schema';
+import { Model } from 'mongoose';
+import { getModelToken } from '@nestjs/mongoose';
+import { WalletService } from '../src/web3-module/wallet.service';
 
 jest.setTimeout(50000);
 describe('Giveaway Controller (e2e)', () => {
@@ -19,6 +27,10 @@ describe('Giveaway Controller (e2e)', () => {
   let memoryServer: MongoMemoryServer;
   let profileService: ProfileService;
   let mockGalachainApi: MockGalachainApi;
+  let giveawayScheduler: GivewayScheduler;
+  let walletService: WalletService;
+  let galachainApi: GalachainApi;
+  let giveawayModel: Model<GiveawayDocument>;
   let secrets: Record<string, any>;
 
   beforeEach(async () => {
@@ -32,17 +44,6 @@ describe('Giveaway Controller (e2e)', () => {
       providers: [dbPlaceHolder],
     });
 
-    // jest.spyOn(global, 'fetch').mockImplementation(
-    //   jest.fn((url: string, data: any) => {
-    //     if (url === secrets['REGISTRATION_ENDPOINT']) {
-    //       console.log('registration');
-    //     }
-    //     console.log(url);
-    //     console.log(data);
-    //     return Promise.resolve({ json: () => Promise.resolve({ data: 100 }) });
-    //   }) as jest.Mock,
-    // );
-
     const moduleFixture = await addDefaultMocks(moduleBuilder);
 
     const compiledFixture = await moduleFixture.compile();
@@ -52,14 +53,26 @@ describe('Giveaway Controller (e2e)', () => {
     profileService = await app.resolve<ProfileService>(ProfileService);
     mockGalachainApi = await app.resolve<MockGalachainApi>(GalachainApi);
     secrets = await app.resolve<Record<string, any>>(APP_SECRETS);
+    giveawayScheduler = await app.resolve<GivewayScheduler>(GivewayScheduler);
+    walletService = await app.resolve<WalletService>(WalletService);
+    galachainApi = await app.resolve<GalachainApi>(GalachainApi);
+    giveawayModel = await app.resolve<Model<GiveawayDocument>>(
+      getModelToken('Giveaway'),
+    );
   });
 
   it('should be defined', () => {
     expect(app).toBeDefined();
   });
 
+  const currentDate = new Date();
+  const endDate = new Date(currentDate);
+  endDate.setDate(currentDate.getDate() + 1);
+
+  const endDateTime = endDate.toISOString();
+
   const startGiveaway = {
-    endDateTime: '2025-01-31T16:34:40.790Z',
+    endDateTime,
     telegramAuthRequired: false,
     requireBurnTokenToClaim: false,
     giveawayType: 'DistributedGiveway',
@@ -178,7 +191,18 @@ describe('Giveaway Controller (e2e)', () => {
     const signer = new SigningClient(wallet.privateKey);
     const signedPayload = await signer.sign('Start Giveaway', startGiveaway);
 
-    return await request(app.getHttpServer())
+    //No giveaways should exist yet
+    await request(app.getHttpServer())
+      .get('/api/giveaway/all')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toHaveLength(0);
+      });
+
+    //Create giveaway successfully
+    await request(app.getHttpServer())
       .post('/api/giveaway/start')
       .set('Content-Type', 'application/json')
       .send(signedPayload)
@@ -186,6 +210,97 @@ describe('Giveaway Controller (e2e)', () => {
         expect(res.body).toMatchObject({ success: true });
       })
       .expect(201);
+
+    //Should exist now when calling all
+    return await request(app.getHttpServer())
+      .get('/api/giveaway/all')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toHaveLength(1);
+
+        expect(res.body[0]).toMatchObject({
+          _id: expect.any(String),
+          giveawayStatus: 'created',
+        });
+      });
+  });
+
+  it('should be able to win a giveaway', async () => {
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
+      await createUser();
+
+    mockGalachainApi.grantAllowancesForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      giveawayCreatorProfile.galaChainAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      GALA_TOKEN,
+      1,
+    );
+
+    const signedPayload = await giveawayCreatorSigner.sign(
+      'Start Giveaway',
+      startGiveaway,
+    );
+
+    //Create giveaway successfully
+    const res = await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect((res) => {
+        expect(res.body).toMatchObject({ success: true });
+      })
+      .expect(201);
+
+    const { profile: giveawayUserProfile, signer: giveawayUserSigner } =
+      await createUser();
+
+    const signedSignupPayload = await giveawayUserSigner.sign('Signup', {
+      giveawayId: res.body.giveaway._id,
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/signup')
+      .set('Content-Type', 'application/json')
+      .send(signedSignupPayload)
+      .expect(201);
+
+    let balances = await galachainApi.fetchBalances(
+      giveawayUserProfile.galaChainAddress,
+    );
+    expect(balances.Data.length).toBe(0);
+
+    //Force the giveaway to end (just a test method)
+    const ended = await endGiveaway(res.body.giveaway._id);
+    expect(ended.acknowledged).toBe(true);
+
+    await giveawayScheduler.handleCron();
+
+    await request(app.getHttpServer())
+      .get('/api/giveaway/all')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toHaveLength(1);
+
+        expect(res.body[0]).toMatchObject({
+          _id: expect.any(String),
+          giveawayStatus: GiveawayStatus.Completed,
+        });
+      });
+
+    balances = await galachainApi.fetchBalances(
+      giveawayUserProfile.galaChainAddress,
+    );
+    expect(balances.Data[0].quantity).toBe(1);
   });
 
   afterEach(async () => {
@@ -196,4 +311,27 @@ describe('Giveaway Controller (e2e)', () => {
       console.error(e);
     }
   });
+
+  async function createUser() {
+    const giveawayCreatorWallet =
+      await WalletUtils.createAndRegisterRandomWallet(
+        secrets['REGISTRATION_ENDPOINT'],
+      );
+
+    const profile = await profileService.createProfile(
+      giveawayCreatorWallet.ethAddress,
+    );
+    const signer = new SigningClient(giveawayCreatorWallet.privateKey);
+
+    return { profile, signer };
+  }
+
+  async function endGiveaway(giveawayId: string) {
+    const newEndDate = new Date();
+    newEndDate.setDate(newEndDate.getDate() - 10);
+    return await giveawayModel.updateOne(
+      { _id: giveawayId },
+      { $set: { endDateTime: newEndDate } },
+    );
+  }
 });

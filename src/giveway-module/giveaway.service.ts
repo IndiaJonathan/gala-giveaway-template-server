@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { GiveawayDocument, Winner } from '../schemas/giveaway.schema';
+import {
+  GiveawayDocument,
+  GiveawayStatus,
+  Winner,
+} from '../schemas/giveaway.schema';
 import { signatures, TokenClassKeyProperties } from '@gala-chain/api';
 import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
@@ -151,7 +155,7 @@ export class GiveawayService {
     const currentDate = new Date();
     return this.giveawayModel
       .find({
-        giveawayStatus: false,
+        giveawayStatus: GiveawayStatus.Created,
         giveawayType: 'DistributedGiveway',
         endDateTime: { $lt: currentDate },
       })

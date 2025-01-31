@@ -5,6 +5,7 @@ import {
   WalletUtils,
   PresignedClient,
   BurnTokensRequest,
+  BatchMintTokenRequest,
 } from '@gala-chain/connect';
 
 import {
@@ -90,6 +91,11 @@ export class GalachainApi implements OnModuleInit {
       },
     );
     return tokenApi.FetchAllowances(fetchAllowanceDto);
+  }
+
+  async batchMintToken(dto: BatchMintTokenRequest) {
+    const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
+    return tokenApi.BatchMintToken(dto);
   }
 
   async isRegistered(address: string) {
