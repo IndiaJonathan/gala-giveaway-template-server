@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { TokenAllowance, TokenClassKeyProperties } from '@gala-chain/api';
 import BigNumber from 'bignumber.js';
-import { ObjectId } from 'mongodb';
 import { GalachainApi } from '../web3-module/galachain.api';
 
 @Injectable()
@@ -10,7 +9,6 @@ export class WalletService {
 
   async getAllowanceQuantity(
     giveawayWalletAddress: string,
-    ownerId: ObjectId,
     tokenClassKey: TokenClassKeyProperties,
   ) {
     const allowances = await this.galachainApi.getAllowancesForToken(
@@ -54,7 +52,6 @@ export class WalletService {
 
   async getBalanceQuantity(
     giveawayWalletAddress: string,
-    ownerId: ObjectId,
     tokenClassKey: TokenClassKeyProperties,
   ) {
     const allowances = await this.galachainApi.getAllowancesForToken(

@@ -15,7 +15,7 @@ import {
   Param,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { GiveawayDto } from '../dtos/giveaway.dto';
+import { GiveawayDto, GiveawayTokenType } from '../dtos/giveaway.dto';
 import { GiveawayService } from './giveaway.service';
 import { signatures } from '@gala-chain/api';
 import { SignupGiveawayDto } from '../dtos/signup-giveaway.dto';
@@ -26,6 +26,7 @@ import { BurnTokensRequestDto } from '../dtos/ClaimWin.dto';
 import { SignatureService } from '../signature.service';
 import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
 import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
+import { ObjectId } from 'mongodb';
 
 @Controller('api/giveaway')
 export class GiveawayController {
@@ -51,10 +52,11 @@ export class GiveawayController {
       const account = await this.profileService.findProfileByGC(gc_address);
 
       const availableTokens =
-        await this.giveawayService.getNetAllowanceQuantity(
+        await this.giveawayService.getNetAvailableTokenQuantity(
           account.giveawayWalletAddress,
-          account.id,
+          account._id as ObjectId,
           giveawayDto.giveawayToken,
+          giveawayDto.giveawayTokenType,
         );
 
       if (giveawayDto.giveawayType === 'DistributedGiveway') {
@@ -249,11 +251,14 @@ export class GiveawayController {
     @Body() tokenClass: TokenInstanceKeyDto,
   ) {
     const userInfo = await this.profileService.findProfileByGC(gcAddress);
-    const allowances = await this.giveawayService.getNetAllowanceQuantity(
+
+    const allowances = await this.giveawayService.getNetAvailableTokenQuantity(
       userInfo.giveawayWalletAddress,
-      userInfo.id,
+      userInfo._id as ObjectId,
       tokenClass,
+      GiveawayTokenType.ALLOWANCE,
     );
+
     const galaBalances = await this.tokenService.getBalancesForToken(
       userInfo.giveawayWalletAddress,
       tokenClass,

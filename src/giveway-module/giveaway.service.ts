@@ -32,6 +32,7 @@ import { BurnTokenQuantityDto } from '../dtos/BurnTokenQuantity.dto';
 import { GalachainApi } from '../web3-module/galachain.api';
 import { PaymentStatusDocument } from '../schemas/PaymentStatusSchema';
 import { WalletService } from '../web3-module/wallet.service';
+import { ProfileDocument } from '../schemas/ProfileSchema';
 
 @Injectable()
 export class GiveawayService {
@@ -502,16 +503,24 @@ export class GiveawayService {
     return totalGalaFee;
   }
 
-  async getNetAllowanceQuantity(
+  async getNetAvailableTokenQuantity(
     giveawayWalletAddress: string,
     ownerId: ObjectId,
     tokenClassKey: TokenClassKeyProperties,
+    giveawayTokenType: GiveawayTokenType,
   ) {
-    const response = await this.walletService.getAllowanceQuantity(
-      giveawayWalletAddress,
-      ownerId,
-      tokenClassKey,
-    );
+    let response;
+    if (giveawayTokenType === GiveawayTokenType.ALLOWANCE) {
+      response = await this.walletService.getAllowanceQuantity(
+        giveawayWalletAddress,
+        tokenClassKey,
+      );
+    } else if (giveawayTokenType === GiveawayTokenType.BALANCE) {
+      response = await this.walletService.getBalanceQuantity(
+        giveawayWalletAddress,
+        tokenClassKey,
+      );
+    }
 
     let totalQuantity = response.totalQuantity;
 
@@ -521,10 +530,7 @@ export class GiveawayService {
     );
 
     undistributedGiveways
-      .filter(
-        (giveaway) =>
-          giveaway.giveawayTokenType === GiveawayTokenType.ALLOWANCE,
-      )
+      .filter((giveaway) => giveaway.giveawayTokenType === giveawayTokenType)
       .forEach((giveaway) => {
         switch (giveaway.giveawayType) {
           case 'DistributedGiveway':
@@ -547,7 +553,6 @@ export class GiveawayService {
   ) {
     const response = await this.walletService.getAllowanceQuantity(
       giveawayWalletAddress,
-      ownerId,
       tokenClassKey,
     );
 
