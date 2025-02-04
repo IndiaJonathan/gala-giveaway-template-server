@@ -20,7 +20,7 @@ export function recoverWalletAddressFromSignature(
   signedObject: object & { signature: string },
 ) {
   const publicKey = recoverPublicKeyFromSignature(signedObject);
-  return recoverAddressFromPublicKey(publicKey);
+  return '0x' + recoverAddressFromPublicKey(publicKey);
 }
 
 export const removePrefixes = (prefixedString: string) => {

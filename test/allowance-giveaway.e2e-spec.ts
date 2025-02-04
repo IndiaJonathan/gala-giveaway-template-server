@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { INestApplication, Provider } from '@nestjs/common';
+import { INestApplication, Provider, ValidationPipe } from '@nestjs/common';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { addDefaultMocks } from './test-utils';
 import { GiveawayModule } from '../src/giveway-module/giveaway.module';
@@ -47,6 +47,14 @@ describe('Giveaway Controller (e2e)', () => {
 
     const compiledFixture = await moduleFixture.compile();
     app = compiledFixture.createNestApplication();
+
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    );
+
     await app.init();
     memoryServer = app.get<MongoMemoryServer>(MONGO_CLIENT_PROVIDER);
     profileService = await app.resolve<ProfileService>(ProfileService);
@@ -324,6 +332,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedSignupPayload = await giveawayUserSigner.sign('Signup', {
       giveawayId: res.body.giveaway._id,
+      uniqueKey: 'giveaway-signup',
     });
 
     await request(app.getHttpServer())

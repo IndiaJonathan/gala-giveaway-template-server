@@ -25,7 +25,10 @@ import { BurnTokensRequestDto } from '../dtos/ClaimWin.dto';
 import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
 import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
 import { ObjectId } from 'mongodb';
-import { validateSignature } from '../utils/web3wallet';
+import {
+  recoverWalletAddressFromSignature,
+  validateSignature,
+} from '../utils/web3wallet';
 import { checkTokenEquality } from '../chain.helper';
 import { GALA_TOKEN } from '../constant';
 
@@ -173,15 +176,11 @@ export class GiveawayController {
 
   @Post('signup')
   async signupForGiveaway(@Body() signUpData: SignupGiveawayDto) {
-    const publicKey = signatures.recoverPublicKey(
-      signUpData.signature,
-      signUpData,
-      '',
-    );
-    const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
+    const eth_address = recoverWalletAddressFromSignature(signUpData);
+    const profile = await this.profileService.findProfileByEth(eth_address);
     const signupResult = await this.giveawayService.signupUserForDistributed(
       signUpData.giveawayId,
-      gc_address,
+      profile.galaChainAddress,
     );
     return signupResult;
   }

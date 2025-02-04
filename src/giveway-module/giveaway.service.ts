@@ -344,10 +344,8 @@ export class GiveawayService {
     giveawayId: string,
     gcAddress: string,
   ): Promise<any> {
-    if (!gcAddress.startsWith('eth|'))
-      throw new BadRequestException(
-        'GC Address must start with eth|, any others are unsupported at the moment.',
-      );
+    if (!gcAddress.startsWith('eth|') && !gcAddress.startsWith('client|'))
+      throw new BadRequestException(`Not a GC address! Got: ${gcAddress}`);
     const giveaway = await this.giveawayModel.findById(giveawayId).exec();
 
     if (!giveaway) {
