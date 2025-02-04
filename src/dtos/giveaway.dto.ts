@@ -53,7 +53,7 @@ export class BasicGiveawaySettingsDto {
 
   @IsNumber()
   @IsNotEmpty()
-  maxWinners?: number;
+  maxWinners: number;
 
   @IsNotEmpty()
   @IsNumberString()

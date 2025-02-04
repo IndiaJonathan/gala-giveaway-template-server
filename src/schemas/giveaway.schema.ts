@@ -14,6 +14,8 @@ export enum GiveawayStatus {
 export interface Winner {
   gcAddress: string;
   winAmount: string;
+  completed: boolean;
+  error?: string;
 }
 
 export interface GiveawayDocument extends Document {
@@ -38,6 +40,8 @@ export interface GiveawayDocument extends Document {
 const WinnerSchema = new Schema<Winner>({
   gcAddress: { type: String, required: true },
   winAmount: { type: String, required: true },
+  completed: { type: Boolean, default: false },
+  error: { type: String, required: false },
 });
 
 export const GiveawaySchema = new Schema<GiveawayDocument>({

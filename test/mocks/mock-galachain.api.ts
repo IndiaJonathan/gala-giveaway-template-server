@@ -4,19 +4,29 @@ import {
   SigningClient,
   BurnTokensRequest,
   BatchMintTokenRequest,
+  TransferTokenRequest,
 } from '@gala-chain/connect';
 
 import {
   BatchMintTokenDto,
   MintTokenDto,
-  TokenBalance,
   TokenClassKeyProperties,
 } from '@gala-chain/api';
 import { APP_SECRETS } from '../../src/secrets/secrets.module';
 import { TokenInstanceKeyDto } from '../../src/dtos/TokenInstanceKey.dto';
 import { computeAddress } from 'ethers';
-import { tokenToReadable } from '../../src/chain.helper';
+import { checkTokenEquality, tokenToReadable } from '../../src/chain.helper';
 import BigNumber from 'bignumber.js';
+import { recoverWalletAddressFromSignature } from '../../src/utils/web3wallet';
+
+interface TokenBalance {
+  owner: string;
+  collection: string;
+  category: string;
+  type: string;
+  additionalKey: string;
+  quantity: BigNumber;
+}
 
 @Injectable()
 export class MockGalachainApi implements OnModuleInit {
@@ -34,7 +44,8 @@ export class MockGalachainApi implements OnModuleInit {
       tokenClass: TokenClassKeyProperties;
     }>
   > = new Map();
-  private tokenBalances: Map<string, { quantity: number }> = new Map();
+
+  private tokenBalances: Map<string, [TokenBalance]> = new Map();
 
   async onModuleInit() {
     const privateKey = this.secrets['GIVEAWAY_PRIVATE_KEY'];
@@ -67,15 +78,25 @@ export class MockGalachainApi implements OnModuleInit {
   }
 
   async fetchBalances(ownerAddress: string) {
-    const foundBalances = [];
-    for (const key of this.tokenBalances.keys()) {
-      if (key.includes(ownerAddress)) {
-        foundBalances.push(this.tokenBalances.get(key));
-      }
-    }
     return {
       success: true,
-      Data: foundBalances,
+      Data: this.tokenBalances[ownerAddress] || [],
+    };
+  }
+
+  async transferToken(dto: TransferTokenRequest, signer?: SigningClient) {
+    const transferFrom =
+      signer.galaChainAddress || this.adminSigner.galaChainAddress;
+
+    this.deductBalance(dto.tokenInstance, dto.quantity as any, transferFrom);
+    this.grantBalanceForToken(dto.to, dto.tokenInstance, Number(dto.quantity));
+    const newBalances = await this.getBalancesForToken(
+      dto.to,
+      dto.tokenInstance as any,
+    );
+    return {
+      success: true,
+      Data: newBalances.Data,
     };
   }
 
@@ -90,18 +111,12 @@ export class MockGalachainApi implements OnModuleInit {
     ownerAddress: string,
     tokenClassKey: TokenInstanceKeyDto,
   ) {
-    const amount = this.tokenBalances.get(
-      this.getBalanceKey(ownerAddress, tokenClassKey),
+    const tokenBalances = this.tokenBalances[ownerAddress].filter((balance) =>
+      checkTokenEquality(balance, tokenClassKey),
     );
     return {
       success: true,
-      Data: [
-        {
-          ...tokenClassKey,
-          owner: ownerAddress,
-          quantity: amount || 0,
-        },
-      ],
+      Data: tokenBalances || [],
     };
   }
 
@@ -109,10 +124,29 @@ export class MockGalachainApi implements OnModuleInit {
     ownerAddress: string,
     tokenClassKey: TokenClassKeyProperties,
   ) {
+    const tokenAllowances = this.allowances[ownerAddress].filter((allowance) =>
+      checkTokenEquality(allowance.tokenClass, tokenClassKey),
+    );
     return {
       success: true,
-      Data: this.allowances.get(ownerAddress) || [],
+      Data: tokenAllowances || [],
     };
+  }
+
+  async getAllowanceAmount(
+    ownerAddress: string,
+    tokenClassKey: TokenClassKeyProperties,
+  ) {
+    const allowances = await this.getAllowancesForToken(
+      ownerAddress,
+      tokenClassKey,
+    );
+
+    const totalQuantity = allowances.Data.filter(
+      (allowance) => allowance.tokenClass === tokenClassKey,
+    ).reduce((sum, allowance) => sum + allowance.quantity, 0);
+
+    return totalQuantity;
   }
 
   //TEST ONLY
@@ -122,11 +156,11 @@ export class MockGalachainApi implements OnModuleInit {
     tokenClass: TokenClassKeyProperties,
     amount: number,
   ) {
-    if (!this.allowances.has(grantedToGC)) {
-      this.allowances.set(grantedToGC, []);
+    if (!this.allowances[grantedToGC]) {
+      this.allowances[grantedToGC] = [];
     }
 
-    this.allowances.get(grantedToGC)?.push({
+    this.allowances[grantedToGC].push({
       grantedBy: grantedFromGC,
       grantedTo: grantedToGC,
       quantity: amount,
@@ -143,13 +177,40 @@ export class MockGalachainApi implements OnModuleInit {
     tokenClass: TokenClassKeyProperties,
     amount: number,
   ) {
-    this.tokenBalances.set(this.getBalanceKey(grantedToGC, tokenClass), {
-      quantity: amount,
-    });
+    if (!this.tokenBalances[grantedToGC]) {
+      this.tokenBalances[grantedToGC] = [];
+    }
+
+    const index = this.tokenBalances[grantedToGC].findIndex(
+      (balance: TokenBalance) => checkTokenEquality(balance, tokenClass),
+    );
+
+    if (index !== -1) {
+      const currentAmount = Number(
+        this.tokenBalances[grantedToGC][index].quantity,
+      );
+      this.tokenBalances[grantedToGC][index].quantity =
+        currentAmount + Number(amount);
+    } else {
+      this.tokenBalances[grantedToGC].push({
+        quantity: amount as any,
+        ...tokenClass,
+        owner: grantedToGC,
+      } as TokenBalance);
+    }
   }
 
-  async batchMintToken(dto: BatchMintTokenRequest) {
+  //TODO: add checks to see if the user has a mint allowance
+  //TODO: mimic gas fee here too
+  async batchMintToken(dto: BatchMintTokenRequest, signer?: SigningClient) {
+    // const signer = recoverWalletAddressFromSignature(dto);
     (dto.mintDtos as unknown as MintTokenDto[]).forEach((mint) => {
+      console.log(mint.signerAddress);
+      this.deductAllowance(
+        mint.tokenClass,
+        Number(mint.quantity),
+        signer.galaChainAddress || this.adminSigner.galaChainAddress,
+      );
       this.grantBalanceForToken(
         mint.owner,
         mint.tokenClass,
@@ -185,7 +246,87 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
-  getBalanceKey(grantedToGC: string, tokenClass: TokenClassKeyProperties) {
-    return grantedToGC + ':' + tokenToReadable(tokenClass);
+  //TEST ONLY
+  deductAllowance(
+    tokenClassKey: TokenClassKeyProperties,
+    amount: number,
+    user: string,
+  ): void {
+    const totalQuantity =
+      this.allowances[user]
+        ?.filter((allowance) =>
+          checkTokenEquality(allowance.tokenClass, tokenClassKey),
+        )
+        // ?.filter((allowance) => allowance.tokenClass === tokenClassKey)
+        .reduce(
+          (sum, allowance) =>
+            sum + allowance.quantity - allowance.quantitySpent,
+          0,
+        ) ?? 0;
+
+    if (totalQuantity < amount) {
+      throw new Error('Insufficient allowance balance');
+    }
+
+    this.allowances[user].forEach((allowance) => {
+      if (
+        checkTokenEquality(allowance.tokenClass, tokenClassKey) &&
+        amount > 0
+      ) {
+        const availableQuantity = allowance.quantity - allowance.quantitySpent;
+
+        if (availableQuantity >= amount) {
+          allowance.quantitySpent += amount;
+          amount = 0;
+        } else {
+          allowance.quantitySpent += availableQuantity;
+          amount -= availableQuantity;
+        }
+      }
+    });
+
+    // If amount is still greater than 0, we haven't been able to deduct the full amount, so throw error
+    if (amount > 0) {
+      throw new Error('Insufficient allowance balance');
+    }
+  }
+
+  deductBalance(
+    tokenClassKey: TokenClassKeyProperties,
+    amount: number,
+    user: string,
+  ): void {
+    const totalQuantity =
+      this.tokenBalances[user]
+        .filter((balance: TokenBalance) =>
+          checkTokenEquality(balance, tokenClassKey),
+        )
+        // ?.filter((allowance) => allowance.tokenClass === tokenClassKey)
+        .reduce(
+          (sum: number, balance: TokenBalance) =>
+            sum + Number(balance.quantity),
+          0,
+        ) ?? 0;
+
+    if (totalQuantity < amount) {
+      throw new Error('Insufficient token balance');
+    }
+
+    this.tokenBalances[user].forEach((balance: TokenBalance) => {
+      if (checkTokenEquality(balance, tokenClassKey) && amount > 0) {
+        const availableQuantity = Number(balance.quantity);
+
+        if (availableQuantity >= amount) {
+          amount = 0;
+        } else {
+          amount -= availableQuantity;
+        }
+      }
+    });
+
+    // If amount is still greater than 0, we haven't been able to deduct the full amount, so throw error
+    if (amount > 0) {
+      throw new Error('Insufficient allowance balance');
+    }
   }
 }

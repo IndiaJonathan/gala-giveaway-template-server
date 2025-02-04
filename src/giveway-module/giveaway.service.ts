@@ -287,6 +287,7 @@ export class GiveawayService {
         gcAddress,
         winAmount: winCount.toString(),
         isDistributed: false,
+        completed: false,
       }),
     );
 
@@ -426,16 +427,18 @@ export class GiveawayService {
       paymentStatus.burnInfo = JSON.stringify(paymentStatus);
       await paymentStatus.save();
     }
-    giveaway.winners.push({
-      gcAddress,
-      winAmount: giveaway.claimPerUser.toString(),
-    });
-    await giveaway.save();
+
     const sendResult = await this.sendWinnings(
       gcAddress,
       new BigNumber(giveaway.claimPerUser),
       giveaway,
     );
+    giveaway.winners.push({
+      gcAddress,
+      winAmount: giveaway.claimPerUser.toString(),
+      completed: true,
+    });
+    await giveaway.save();
     paymentStatus.winningInfo = JSON.stringify(sendResult);
     await paymentStatus.save();
     if (sendResult.Status === 1) {
@@ -478,10 +481,15 @@ export class GiveawayService {
     }
   }
 
-  getRequiredGalaFeeForGiveaway(giveaway: GiveawayDocument | GiveawayDto) {
+  getRequiredGalaGasFeeForGiveaway(giveaway: GiveawayDocument | GiveawayDto) {
     switch (giveaway.giveawayType) {
       case 'DistributedGiveway':
-        return BigNumber(1);
+        switch (giveaway.giveawayTokenType) {
+          case GiveawayTokenType.BALANCE:
+            return BigNumber(1).multipliedBy(giveaway.maxWinners);
+          case GiveawayTokenType.ALLOWANCE:
+            return BigNumber(1);
+        }
       case 'FirstComeFirstServe':
         //todo run dryrun
         return BigNumber(
@@ -494,7 +502,9 @@ export class GiveawayService {
     const undistributedGiveways = await this.findUndistributed(ownerId);
     const totalGalaFee = undistributedGiveways.reduce(
       (accumulator, giveaway) => {
-        const fee = new BigNumber(this.getRequiredGalaFeeForGiveaway(giveaway));
+        const fee = new BigNumber(
+          this.getRequiredGalaGasFeeForGiveaway(giveaway),
+        );
         return accumulator.plus(fee);
       },
       new BigNumber(0),
@@ -508,20 +518,18 @@ export class GiveawayService {
     tokenClassKey: TokenClassKeyProperties,
     giveawayTokenType: GiveawayTokenType,
   ) {
-    let response;
+    let totalQuantity: BigNumber;
     if (giveawayTokenType === GiveawayTokenType.ALLOWANCE) {
-      response = await this.walletService.getAllowanceQuantity(
+      totalQuantity = await this.walletService.getAllowanceQuantity(
         giveawayWalletAddress,
         tokenClassKey,
       );
     } else if (giveawayTokenType === GiveawayTokenType.BALANCE) {
-      response = await this.walletService.getBalanceQuantity(
+      totalQuantity = await this.walletService.getBalanceQuantity(
         giveawayWalletAddress,
         tokenClassKey,
       );
     }
-
-    let totalQuantity = response.totalQuantity;
 
     const undistributedGiveways = await this.findUndistributed(
       ownerId,
@@ -542,7 +550,7 @@ export class GiveawayService {
         }
       });
 
-    return { totalQuantity, unusableQuantity: response.unusableQuantity };
+    return totalQuantity;
   }
 
   async getNetBalanceQuantity(
@@ -550,12 +558,10 @@ export class GiveawayService {
     ownerId: ObjectId,
     tokenClassKey: TokenClassKeyProperties,
   ) {
-    const response = await this.walletService.getAllowanceQuantity(
+    let totalQuantity = await this.walletService.getAllowanceQuantity(
       giveawayWalletAddress,
       tokenClassKey,
     );
-
-    let totalQuantity = response.totalQuantity;
 
     const undistributedGiveways = await this.findUndistributed(
       ownerId,
@@ -574,6 +580,6 @@ export class GiveawayService {
       }
     });
 
-    return { totalQuantity, unusableQuantity: response.unusableQuantity };
+    return totalQuantity;
   }
 }

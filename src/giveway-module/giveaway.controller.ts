@@ -26,6 +26,8 @@ import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
 import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
 import { ObjectId } from 'mongodb';
 import { validateSignature } from '../utils/web3wallet';
+import { checkTokenEquality } from '../chain.helper';
+import { GALA_TOKEN } from '../constant';
 
 @Controller('api/giveaway')
 export class GiveawayController {
@@ -68,28 +70,25 @@ export class GiveawayController {
           giveawayDto.giveawayTokenType,
         );
 
-      if (giveawayDto.giveawayType === 'DistributedGiveway') {
-        if (
-          BigNumber(availableTokens.totalQuantity).minus(
-            BigNumber(giveawayDto.tokenQuantity),
-          ) < BigNumber(0)
-        ) {
-          throw new UnauthorizedException(
-            'You need to grant more tokens before you can start this giveaway',
-          );
-        }
-      } else {
-        if (
-          BigNumber(availableTokens.totalQuantity).minus(
-            BigNumber(giveawayDto.claimPerUser).multipliedBy(
+      const tokensToGiveaway = (() => {
+        switch (giveawayDto.giveawayType) {
+          case 'FirstComeFirstServe':
+            return BigNumber(giveawayDto.claimPerUser).multipliedBy(
               giveawayDto.maxWinners,
-            ),
-          ) < BigNumber(0)
-        ) {
-          throw new UnauthorizedException(
-            'You need to grant more tokens before you can start this giveaway',
-          );
+            );
+          case 'DistributedGiveway':
+            return BigNumber(giveawayDto.tokenQuantity).multipliedBy(
+              BigNumber(giveawayDto.maxWinners),
+            );
         }
+      })();
+      if (
+        BigNumber(availableTokens).minus(BigNumber(tokensToGiveaway)) <
+        BigNumber(0)
+      ) {
+        throw new UnauthorizedException(
+          'You need to grant more tokens before you can start this giveaway',
+        );
       }
 
       //todo: ADD this back
@@ -128,13 +127,21 @@ export class GiveawayController {
         return total.plus(item.quantity);
       }, new BigNumber(0));
 
-      const extraAmount =
-        this.giveawayService.getRequiredGalaFeeForGiveaway(giveawayDto);
+      const gasFees =
+        this.giveawayService.getRequiredGalaGasFeeForGiveaway(giveawayDto);
 
-      const currentRequirement =
+      const currentGiveawayEscrows =
         await this.giveawayService.getTotalGalaFeesRequired(account.id);
 
-      const net = galaBalance.minus(extraAmount.plus(currentRequirement));
+      let totalRequirement = gasFees.plus(currentGiveawayEscrows);
+
+      if (giveawayDto.giveawayTokenType === GiveawayTokenType.BALANCE) {
+        if (checkTokenEquality(giveawayDto.giveawayToken, GALA_TOKEN)) {
+          totalRequirement = totalRequirement.plus(tokensToGiveaway);
+        }
+      }
+      const net = galaBalance.minus(totalRequirement);
+
       //todo: unhardcode this from 1, use dry run
       if (net.lt(0)) {
         throw new BadRequestException(

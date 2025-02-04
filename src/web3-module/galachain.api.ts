@@ -3,9 +3,9 @@ import {
   TokenApi,
   SigningClient,
   WalletUtils,
-  PresignedClient,
   BurnTokensRequest,
   BatchMintTokenRequest,
+  TransferTokenRequest,
 } from '@gala-chain/connect';
 
 import {
@@ -43,17 +43,23 @@ export class GalachainApi implements OnModuleInit {
     return tokenApi.FetchBalances(fetchBalances);
   }
 
-  async burnToken(request: BurnTokensRequest) {
-    const presignedClient = new PresignedClient();
-    const tokenApi = new TokenApi(this.tokenApiEndpoint, presignedClient);
+  async burnToken(request: BurnTokensRequest, signer?: SigningClient) {
+    const tokenApi = new TokenApi(
+      this.tokenApiEndpoint,
+      signer || this.adminSigner,
+    );
     return tokenApi.BurnTokens(request);
   }
 
   async getBalancesForToken(
     ownerAddress: string,
     tokenClassKey: TokenInstanceKeyDto,
+    signer?: SigningClient,
   ) {
-    const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
+    const tokenApi = new TokenApi(
+      this.tokenApiEndpoint,
+      signer || this.adminSigner,
+    );
     const fetchAllowanceDto = await createValidDTO<FetchBalancesDto>(
       FetchBalancesDto,
       {
@@ -93,8 +99,19 @@ export class GalachainApi implements OnModuleInit {
     return tokenApi.FetchAllowances(fetchAllowanceDto);
   }
 
-  async batchMintToken(dto: BatchMintTokenRequest) {
-    const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
+  async transferToken(dto: TransferTokenRequest, signer?: SigningClient) {
+    const tokenApi = new TokenApi(
+      this.tokenApiEndpoint,
+      signer || this.adminSigner,
+    );
+    return tokenApi.TransferToken(dto);
+  }
+
+  async batchMintToken(dto: BatchMintTokenRequest, signer?: SigningClient) {
+    const tokenApi = new TokenApi(
+      this.tokenApiEndpoint,
+      signer || this.adminSigner,
+    );
     return tokenApi.BatchMintToken(dto);
   }
 

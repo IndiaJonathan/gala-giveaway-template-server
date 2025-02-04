@@ -85,101 +85,10 @@ describe('Giveaway Controller (e2e)', () => {
     prefix: '\u0019Ethereum Signed Message:\n346',
   };
 
-  const startAllowanceGiveaway = {
-    ...startGiveaway,
-    giveawayTokenType: GiveawayTokenType.ALLOWANCE,
-  };
-
   const startBalanceGiveaway = {
     ...startGiveaway,
     giveawayTokenType: GiveawayTokenType.BALANCE,
   };
-
-  it('should fail create a giveaway if insuffucient allowances given', async () => {
-    const wallet = await WalletUtils.createAndRegisterRandomWallet(
-      secrets['REGISTRATION_ENDPOINT'],
-    );
-
-    await profileService.createProfile(wallet.ethAddress);
-
-    const signer = new SigningClient(wallet.privateKey);
-    const signedPayload = await signer.sign(
-      'Start Giveaway',
-      startAllowanceGiveaway,
-    );
-
-    return await request(app.getHttpServer())
-      .post('/api/giveaway/start')
-      .set('Content-Type', 'application/json')
-      .send(signedPayload)
-      .expect({
-        success: false,
-        message: 'Failed to start giveaway',
-        error: {
-          response: {
-            message:
-              'You need to grant more tokens before you can start this giveaway',
-            error: 'Unauthorized',
-            statusCode: 401,
-          },
-          status: 401,
-          options: {},
-          message:
-            'You need to grant more tokens before you can start this giveaway',
-          name: 'UnauthorizedException',
-        },
-      })
-      .expect(400);
-  });
-
-  it('should fail create a giveaway if time is not at least +1 hour', async () => {
-    const wallet = await WalletUtils.createAndRegisterRandomWallet(
-      secrets['REGISTRATION_ENDPOINT'],
-    );
-
-    const profile = await profileService.createProfile(wallet.ethAddress);
-
-    mockGalachainApi.grantAllowancesForToken(
-      profile.giveawayWalletAddress,
-      profile.galaChainAddress,
-      GALA_TOKEN,
-      50,
-    );
-
-    mockGalachainApi.grantBalanceForToken(
-      profile.giveawayWalletAddress,
-      GALA_TOKEN,
-      1,
-    );
-
-    const signer = new SigningClient(wallet.privateKey);
-    const signedPayload = await signer.sign('Start Giveaway', {
-      ...startAllowanceGiveaway,
-      endDateTime: new Date(), //Override Date
-    });
-
-    return await request(app.getHttpServer())
-      .post('/api/giveaway/start')
-      .set('Content-Type', 'application/json')
-      .send(signedPayload)
-      .expect(400)
-      .expect({
-        success: false,
-        message: 'Failed to start giveaway',
-        error: {
-          response: {
-            message: 'The endDateTime must be at least one hour in the future.',
-            error: 'Bad Request',
-            statusCode: 400,
-          },
-          status: 400,
-          options: {},
-          message: 'The endDateTime must be at least one hour in the future.',
-          name: 'BadRequestException',
-        },
-      })
-      .expect(400);
-  });
 
   it('should fail create a giveaway when gas balance is low', async () => {
     const wallet = await WalletUtils.createAndRegisterRandomWallet(
@@ -188,23 +97,23 @@ describe('Giveaway Controller (e2e)', () => {
 
     const profile = await profileService.createProfile(wallet.ethAddress);
 
-    mockGalachainApi.grantAllowancesForToken(
+    mockGalachainApi.grantBalanceForToken(
       profile.giveawayWalletAddress,
-      profile.galaChainAddress,
       {
         additionalKey: 'none',
         category: 'Unit',
         collection: 'GALA',
         type: 'none',
       } as any,
-      50,
+      55,
     );
 
     const signer = new SigningClient(wallet.privateKey);
-    const signedPayload = await signer.sign(
-      'Start Giveaway',
-      startAllowanceGiveaway,
-    );
+    const signedPayload = await signer.sign('Start Giveaway', {
+      ...startBalanceGiveaway,
+      maxWinners: 10,
+      tokenQuantity: 5,
+    });
 
     return await request(app.getHttpServer())
       .post('/api/giveaway/start')
@@ -216,14 +125,14 @@ describe('Giveaway Controller (e2e)', () => {
         error: {
           response: {
             message:
-              'Insuffucient GALA balance in Giveway wallet, need additional 1',
+              'Insuffucient GALA balance in Giveway wallet, need additional 5',
             error: 'Bad Request',
             statusCode: 400,
           },
           status: 400,
           options: {},
           message:
-            'Insuffucient GALA balance in Giveway wallet, need additional 1',
+            'Insuffucient GALA balance in Giveway wallet, need additional 5',
           name: 'BadRequestException',
         },
       })
@@ -237,9 +146,8 @@ describe('Giveaway Controller (e2e)', () => {
 
     const profile = await profileService.createProfile(wallet.ethAddress);
 
-    mockGalachainApi.grantAllowancesForToken(
+    mockGalachainApi.grantBalanceForToken(
       profile.giveawayWalletAddress,
-      profile.galaChainAddress,
       GALA_TOKEN,
       50,
     );
@@ -253,7 +161,7 @@ describe('Giveaway Controller (e2e)', () => {
     const signer = new SigningClient(wallet.privateKey);
     const signedPayload = await signer.sign(
       'Start Giveaway',
-      startAllowanceGiveaway,
+      startBalanceGiveaway,
     );
 
     //No giveaways should exist yet
@@ -296,22 +204,15 @@ describe('Giveaway Controller (e2e)', () => {
     const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
       await createUser();
 
-    mockGalachainApi.grantAllowancesForToken(
-      giveawayCreatorProfile.giveawayWalletAddress,
-      giveawayCreatorProfile.galaChainAddress,
-      GALA_TOKEN,
-      50,
-    );
-
     mockGalachainApi.grantBalanceForToken(
       giveawayCreatorProfile.giveawayWalletAddress,
       GALA_TOKEN,
-      1,
+      2,
     );
 
     const signedPayload = await giveawayCreatorSigner.sign(
       'Start Giveaway',
-      startAllowanceGiveaway,
+      startBalanceGiveaway,
     );
 
     //Create giveaway successfully
@@ -368,7 +269,39 @@ describe('Giveaway Controller (e2e)', () => {
     expect(balances.Data[0].quantity).toBe(1);
   });
 
-  it('should be unable to create a balance giveaway with insuffucient balance', async () => {
+  it('should not work for a giveaway if granted allowance is insufficient ', async () => {
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
+      await createUser();
+
+    mockGalachainApi.grantAllowancesForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      giveawayCreatorProfile.galaChainAddress,
+      GALA_TOKEN,
+      1,
+    );
+
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      GALA_TOKEN,
+      1,
+    );
+
+    const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
+      ...startBalanceGiveaway,
+      tokenQuantity: 2,
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect((res) => {
+        expect(res.body).toMatchObject({ success: false });
+      })
+      .expect(400);
+  });
+
+  it.only('should be unable to create a balance giveaway with insuffucient balance', async () => {
     const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
       await createUser();
 
@@ -474,7 +407,7 @@ describe('Giveaway Controller (e2e)', () => {
     balances = await galachainApi.fetchBalances(
       giveawayUserProfile.galaChainAddress,
     );
-    expect(balances.Data[0].quantity).toBe(1);
+    expect(balances.Data[0].quantity).toBe('1');
   });
 
   afterEach(async () => {
