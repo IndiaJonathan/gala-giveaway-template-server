@@ -350,7 +350,7 @@ describe('Giveaway Controller (e2e)', () => {
       });
   });
 
-  it.only('should be able to create and win a balance giveaway', async () => {
+  it('should be able to create and win a balance giveaway', async () => {
     const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
       await createUser();
 
