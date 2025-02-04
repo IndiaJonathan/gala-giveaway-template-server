@@ -82,13 +82,20 @@ export class GiveawayController {
             );
         }
       })();
-      if (
-        BigNumber(availableTokens).minus(BigNumber(tokensToGiveaway)) <
-        BigNumber(0)
-      ) {
-        throw new UnauthorizedException(
-          'You need to grant more tokens before you can start this giveaway',
-        );
+      const tokenDiff = BigNumber(availableTokens).minus(
+        BigNumber(tokensToGiveaway),
+      );
+      if (tokenDiff.lt(0)) {
+        switch (giveawayDto.giveawayTokenType) {
+          case GiveawayTokenType.BALANCE:
+            throw new BadRequestException(
+              `You need to transfer more tokens before you can start this giveaway. Need an additional ${tokenDiff.multipliedBy(-1)}`,
+            );
+          case GiveawayTokenType.ALLOWANCE:
+            throw new BadRequestException(
+              `You need to grant more tokens before you can start this giveaway. Need an additional ${tokenDiff.multipliedBy(-1)}`,
+            );
+        }
       }
 
       //todo: ADD this back
@@ -133,14 +140,14 @@ export class GiveawayController {
       const currentGiveawayEscrows =
         await this.giveawayService.getTotalGalaFeesRequired(account.id);
 
-      let totalRequirement = gasFees.plus(currentGiveawayEscrows);
+      let totalGalaRequirement = gasFees.plus(currentGiveawayEscrows);
 
       if (giveawayDto.giveawayTokenType === GiveawayTokenType.BALANCE) {
         if (checkTokenEquality(giveawayDto.giveawayToken, GALA_TOKEN)) {
-          totalRequirement = totalRequirement.plus(tokensToGiveaway);
+          totalGalaRequirement = totalGalaRequirement.plus(tokensToGiveaway);
         }
       }
-      const net = galaBalance.minus(totalRequirement);
+      const net = galaBalance.minus(totalGalaRequirement);
 
       //todo: unhardcode this from 1, use dry run
       if (net.lt(0)) {

@@ -301,7 +301,7 @@ describe('Giveaway Controller (e2e)', () => {
       .expect(400);
   });
 
-  it.only('should be unable to create a balance giveaway with insuffucient balance', async () => {
+  it('should be unable to create a balance giveaway with insuffucient balance', async () => {
     const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
       await createUser();
 
@@ -328,14 +328,14 @@ describe('Giveaway Controller (e2e)', () => {
         error: {
           response: {
             message:
-              'Insuffucient GALA balance in Giveway wallet, need additional 1',
+              'You need to transfer more tokens before you can start this giveaway. Need an additional 1',
             error: 'Bad Request',
             statusCode: 400,
           },
           status: 400,
           options: {},
           message:
-            'Insuffucient GALA balance in Giveway wallet, need additional 1',
+            'You need to transfer more tokens before you can start this giveaway. Need an additional 1',
           name: 'BadRequestException',
         },
       });
@@ -407,7 +407,7 @@ describe('Giveaway Controller (e2e)', () => {
     balances = await galachainApi.fetchBalances(
       giveawayUserProfile.galaChainAddress,
     );
-    expect(balances.Data[0].quantity).toBe('1');
+    expect(balances.Data[0].quantity).toBe(1);
   });
 
   afterEach(async () => {

@@ -113,15 +113,15 @@ describe('Giveaway Controller (e2e)', () => {
         error: {
           response: {
             message:
-              'You need to grant more tokens before you can start this giveaway',
-            error: 'Unauthorized',
-            statusCode: 401,
+              'You need to grant more tokens before you can start this giveaway. Need an additional 1',
+            error: 'Bad Request',
+            statusCode: 400,
           },
-          status: 401,
+          status: 400,
           options: {},
           message:
-            'You need to grant more tokens before you can start this giveaway',
-          name: 'UnauthorizedException',
+            'You need to grant more tokens before you can start this giveaway. Need an additional 1',
+          name: 'BadRequestException',
         },
       })
       .expect(400);

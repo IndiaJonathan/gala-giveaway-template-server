@@ -164,6 +164,7 @@ export class GivewayScheduler {
           if (giveaway.giveawayErrors.length > 5) {
             //5 or more errors, just call it
             giveaway.giveawayStatus = GiveawayStatus.Errored;
+            console.error(`Giveaway: ${giveaway._id} has errored out!!!`);
           }
           await giveaway.save();
           const user = getUserFromMessage(e.Message);
