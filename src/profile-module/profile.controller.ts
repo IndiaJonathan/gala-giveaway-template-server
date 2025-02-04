@@ -9,12 +9,15 @@ import {
   Param,
   ConflictException,
   Inject,
+  BadRequestException,
 } from '@nestjs/common';
-import { ProfileService } from '../services/profile.service';
+import { ProfileService } from './profile.service';
 import { LinkDto } from '../dtos/profile.dto';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import { GiveawayService } from '../giveway-module/giveaway.service';
-import { SignatureService } from '../signature.service';
+import { GalachainApi } from '../web3-module/galachain.api';
+import { isAddress } from 'ethers';
+import { validateSignature } from '../utils/web3wallet';
 
 @Controller('api/profile')
 export class ProfileController {
@@ -22,14 +25,30 @@ export class ProfileController {
     private profileService: ProfileService,
     private giveawayService: GiveawayService,
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
-    @Inject(SignatureService) private signatureService: SignatureService,
+    @Inject(GalachainApi) private galachainApi: GalachainApi,
+    private tokenService: GalachainApi,
   ) {}
 
-  @Get('info/:gcAddress')
-  async getProfile(@Param('gcAddress') gcAddress) {
-    const profile = await this.profileService.getSafeUserByGC(gcAddress, true);
-    const claimableWins =
-      await this.giveawayService.getClaimableWins(gcAddress);
+  @Get('info/isRegistered')
+  async getIsRegistered(@Param('address') address) {
+    const isRegistered = this.galachainApi.isRegistered(address);
+    return isRegistered;
+  }
+
+  @Get('info/:ethAddress')
+  async getProfile(@Param('ethAddress') ethAddress) {
+    if (!isAddress(ethAddress)) {
+      throw new BadRequestException(
+        'Invalid Ethereum address. Address must be a valid Ethereum address format.',
+      );
+    }
+    const profile = await this.profileService.getSafeUserByEth(
+      ethAddress,
+      true,
+    );
+    const claimableWins = await this.giveawayService.getClaimableWins(
+      profile.galaChainAddress,
+    );
     return {
       ...profile,
       claimableWins,
@@ -47,7 +66,7 @@ export class ProfileController {
       );
     }
 
-    const gc_address = this.signatureService.validateSignature(linkDto);
+    const gc_address = validateSignature(linkDto);
 
     // Validate if the GalaChain address matches
     if (gc_address !== linkDto['GalaChain Address']) {
@@ -66,7 +85,6 @@ export class ProfileController {
     if (isTelegramValid) {
       const profile = await this.profileService.findProfileByGC(
         linkDto['GalaChain Address'],
-        true,
       );
       profile.telegramId = linkDto.id;
       profile.firstName = linkDto.first_name;
@@ -92,6 +110,37 @@ export class ProfileController {
         success: false,
         message: 'Invalid authentication data',
       });
+    }
+  }
+
+  @Get('giveaway-wallet-balances/:gcAddress')
+  async getAdminBalances(@Param('gcAddress') gcAddress: string) {
+    try {
+      const userInfo = await this.profileService.findProfileByGC(gcAddress);
+      const balances = await this.tokenService.fetchBalances(
+        userInfo.giveawayWalletAddress,
+      );
+      return balances;
+    } catch (error) {
+      console.error(error);
+      throw new BadRequestException(
+        `Failed to fetch balances, error: ${error}`,
+      );
+    }
+  }
+
+  @Get('giveaway-wallet-allowances/:gcAddress')
+  async getAdminAllowances(@Param('gcAddress') gcAddress: string) {
+    try {
+      const userInfo = await this.profileService.findProfileByGC(gcAddress);
+
+      const balances = await this.tokenService.fetchAllowances(
+        userInfo.giveawayWalletAddress,
+      );
+      return balances;
+    } catch (error) {
+      console.error(error);
+      throw new BadRequestException('Failed to fetch balances');
     }
   }
 }

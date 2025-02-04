@@ -13,6 +13,18 @@ export function checksumGCAddress(gcAddress: string) {
   return getAddress(ethAddress).replace('0x', 'eth|');
 }
 
+export function checkTokenEquality(
+  token1: TokenClassKeyProperties | TokenInstanceKeyDto,
+  token2: TokenClassKeyProperties | TokenInstanceKeyDto,
+) {
+  return (
+    token1.additionalKey === token2.additionalKey &&
+    token1.category === token2.category &&
+    token1.collection === token2.collection &&
+    token1.type === token2.type
+  );
+}
+
 export function tokenToReadable(
   token: TokenClassKeyProperties | TokenInstanceKeyDto,
 ) {

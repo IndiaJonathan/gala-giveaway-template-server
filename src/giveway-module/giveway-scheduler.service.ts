@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { GiveawayService } from './giveaway.service';
-import { ProfileService } from '../services/profile.service';
+import { ProfileService } from '../profile-module/profile.service';
 import {
   GalaChainResponseError,
   SigningClient,
@@ -9,11 +9,15 @@ import {
   WalletUtils,
 } from '@gala-chain/connect';
 import { APP_SECRETS } from '../secrets/secrets.module';
+import { GiveawayDocument, GiveawayStatus } from '../schemas/giveaway.schema';
+import { GalachainApi } from '../web3-module/galachain.api';
+import { GiveawayTokenType } from '../dtos/giveaway.dto';
 
 @Injectable()
 export class GivewayScheduler {
   constructor(
     private giveawayService: GiveawayService,
+    private galachainApi: GalachainApi,
     private profileService: ProfileService,
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
   ) {}
@@ -25,7 +29,6 @@ export class GivewayScheduler {
       return;
     }
 
-    const tokenApiEndpoint = this.secrets['TOKEN_API_ENDPOINT'];
     const encryptionKey = this.secrets['ENCRYPTION_KEY'];
 
     for (let index = 0; index < giveaways.length; index++) {
@@ -35,9 +38,8 @@ export class GivewayScheduler {
       );
       const decryptedKey =
         await creatorProfile.decryptPrivateKey(encryptionKey);
-      const giveawayWalletSigner = new SigningClient(decryptedKey);
       await this.profileService.checkAndRegisterProfile(decryptedKey);
-      const tokenApi = new TokenApi(tokenApiEndpoint, giveawayWalletSigner);
+      const giveawayWalletSigner = new SigningClient(decryptedKey);
 
       let winners = giveaway.winners;
       if (!giveaway.winners || !giveaway.winners.length) {
@@ -47,7 +49,7 @@ export class GivewayScheduler {
         console.log(`Determined ${giveaway.winners} winners`);
       }
       if (winners.length === 0) {
-        giveaway.distributed = true;
+        giveaway.giveawayStatus = GiveawayStatus.Cancelled;
         await giveaway.save();
         continue;
       } else {
@@ -64,27 +66,106 @@ export class GivewayScheduler {
             giveaway.id,
             winners,
           );
-          giveaway.distributed = true;
+          giveaway.giveawayStatus = GiveawayStatus.Completed;
           await giveaway.save();
           console.log(`Burn Giveaway done!`);
         } else {
           //Mint directly
-          const mintResult = await tokenApi.BatchMintToken({
-            mintDtos: mappedWinners as any,
-          });
-          if (mintResult.Status === 1) {
-            giveaway.distributed = true;
-            console.log(`Giveway done!`);
-          } else {
-            giveaway.error = (mintResult as any).message;
-            console.log(
-              `Giveaway had errors, will retry later. Error: ${giveaway.error}`,
+          if (giveaway.giveawayTokenType === GiveawayTokenType.ALLOWANCE) {
+            const mintResult = await this.galachainApi.batchMintToken(
+              {
+                mintDtos: mappedWinners as any,
+              },
+              giveawayWalletSigner,
             );
-            await giveaway.save();
+            if (mintResult.Status === 1) {
+              giveaway.giveawayStatus = GiveawayStatus.Completed;
+              console.log(`Giveway done!`);
+            } else {
+              giveaway.giveawayErrors.push((mintResult as any).message);
+              console.log(
+                `Giveaway had errors, will retry later. Error: ${(mintResult as any).message}`,
+              );
+            }
+          } else if (giveaway.giveawayTokenType === GiveawayTokenType.BALANCE) {
+            const transfers = await Promise.all(
+              mappedWinners.map(async (winner) => {
+                try {
+                  const transferResult = await this.galachainApi.transferToken(
+                    {
+                      quantity: winner.quantity as any,
+                      to: winner.owner,
+                      tokenInstance: {
+                        ...winner.tokenClass,
+                        instance: '0' as any,
+                      },
+                    },
+                    giveawayWalletSigner,
+                  );
+
+                  return { success: true, result: transferResult };
+                } catch (error) {
+                  return {
+                    success: false,
+                    error: error.message || JSON.stringify(error),
+                    owner: winner.owner,
+                  };
+                }
+              }),
+            );
+
+            for (const transferResult of transfers) {
+              let owner: string;
+              if (transferResult.success) {
+                if (transferResult.result.Data.length > 1) {
+                  console.error(
+                    'Multiple txs found!!!!',
+                    `${JSON.stringify(transferResult)}`,
+                  );
+                }
+                owner = transferResult.result.Data[0].owner;
+              } else {
+                owner = transferResult.owner;
+              }
+              const index = giveaway.winners.findIndex(
+                (winner) => winner.gcAddress === owner,
+              );
+              if (index === -1) {
+                await throwAndLogGiveawayError(
+                  giveaway,
+                  `Unable to find gcAddress for winner. Winner: ${owner}`,
+                );
+              }
+
+              if (transferResult.error) {
+                giveaway.winners[index].error = transferResult.error;
+              } else {
+                giveaway.winners[index].completed = true;
+              }
+            }
+
+            const completed = giveaway.winners.every(
+              (winner) => winner.completed,
+            );
+            if (completed) {
+              giveaway.giveawayStatus = GiveawayStatus.Completed;
+            }
+          } else {
+            giveaway.giveawayErrors.push(
+              `Unknown giveawayTokenType: ${giveaway.giveawayTokenType}`,
+            );
+            giveaway.giveawayStatus = GiveawayStatus.Errored;
           }
+          await giveaway.save();
         }
       } catch (e) {
         if (e instanceof GalaChainResponseError) {
+          giveaway.giveawayErrors.push(JSON.stringify(e));
+          if (giveaway.giveawayErrors.length > 5) {
+            //5 or more errors, just call it
+            giveaway.giveawayStatus = GiveawayStatus.Errored;
+          }
+          await giveaway.save();
           const user = getUserFromMessage(e.Message);
           if (!user) {
             console.error(e);
@@ -108,6 +189,15 @@ export class GivewayScheduler {
       }
     }
   }
+}
+
+async function throwAndLogGiveawayError(
+  giveaway: GiveawayDocument,
+  error: string,
+) {
+  giveaway.giveawayErrors.push(error);
+  await giveaway.save();
+  throw error;
 }
 
 function getUserFromMessage(message: string) {

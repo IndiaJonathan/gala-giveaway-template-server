@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { omit } from 'lodash';
@@ -13,11 +14,11 @@ import { LinkDto } from '../dtos/profile.dto';
 import { MongoError, ObjectId } from 'mongodb';
 import {
   GalaChainResponseError,
-  PublicKeyApi,
   SigningClient,
   WalletUtils,
 } from '@gala-chain/connect';
 import { APP_SECRETS } from '../secrets/secrets.module';
+import { GalachainApi } from '../web3-module/galachain.api';
 
 @Injectable()
 export class ProfileService {
@@ -25,6 +26,7 @@ export class ProfileService {
     @InjectModel('Profile') // Inject the Mongoose model for Profile
     private readonly profileModel: Model<ProfileDocument>,
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
+    @Inject(GalachainApi) private galaChainApi: GalachainApi,
   ) {}
 
   // Method to check Telegram authorization using HMAC
@@ -60,15 +62,19 @@ export class ProfileService {
   }
 
   // Create a new profile
-  async createProfile(ethAddress: string, galaChainAddress: string) {
+  async createProfile(ethAddress: string) {
     const registrationURL = await this.secrets['REGISTRATION_ENDPOINT'];
 
+    const galachainAlias = await this.galaChainApi.isRegistered(ethAddress);
+    if (!galachainAlias.alias) {
+      throw new UnauthorizedException('Must create a galachain account first');
+    }
     const giveawayWalletAddress =
       await WalletUtils.createAndRegisterRandomWallet(registrationURL);
     // Create a new profile object with the unique fields
     const newProfile = new this.profileModel({
       ethAddress: ethAddress,
-      galaChainAddress: galaChainAddress,
+      galaChainAddress: galachainAlias.alias,
       giveawayWalletAddress: giveawayWalletAddress.galachainAddress,
       giveawayWalletAddressPrivateKey: giveawayWalletAddress.privateKey,
       giveawayWalletPublicKey: giveawayWalletAddress.publicKey,
@@ -101,22 +107,34 @@ export class ProfileService {
     return this.profileModel.findOne({ _id: profileId }).exec();
   }
 
-  async findProfileByGC(gcAddress: string, createIfNotFound = false) {
+  async findProfileByGC(gcAddress: string) {
     const profile = await this.profileModel
       .findOne({ galaChainAddress: gcAddress })
       .exec();
 
     // If the profile is not found, throw a NotFoundException
     if (!profile) {
+      throw new NotFoundException(
+        `Profile with GC address ${gcAddress} not found`,
+      );
+    }
+
+    return profile;
+  }
+
+  async findProfileByEth(ethAddress: string, createIfNotFound = false) {
+    const profile = await this.profileModel
+      .findOne({ ethAddress: ethAddress })
+      .exec();
+
+    // If the profile is not found, throw a NotFoundException
+    if (!profile) {
       if (createIfNotFound) {
-        const profile = this.createProfile(
-          gcAddress.replace('eth|', '0x'),
-          gcAddress,
-        );
+        const profile = this.createProfile(ethAddress);
         return profile;
       } else {
         throw new NotFoundException(
-          `Profile with GC address ${gcAddress} not found`,
+          `Profile with ETH address ${ethAddress} not found`,
         );
       }
     }
@@ -124,8 +142,8 @@ export class ProfileService {
     return profile;
   }
 
-  async getSafeUserByGC(gcAddress: string, createIfNotFound = false) {
-    const profile = await this.findProfileByGC(gcAddress, createIfNotFound);
+  async getSafeUserByEth(ethAddress: string, createIfNotFound = false) {
+    const profile = await this.findProfileByEth(ethAddress, createIfNotFound);
     return {
       id: profile._id as ObjectId,
       galaChainAddress: profile.galaChainAddress,
@@ -158,18 +176,16 @@ export class ProfileService {
 
   async checkAndRegisterProfile(privateKey: string) {
     const registrationEndpoint = await this.secrets['REGISTRATION_ENDPOINT'];
-    const publicKeyEndpoint = await this.secrets['PUBLIC_KEY_API_ENDPOINT'];
 
     const client = new SigningClient(privateKey);
-    const publicKeyApi = new PublicKeyApi(publicKeyEndpoint, client);
     const publicKey = await client.getPublicKey();
-
     try {
-      const profile = await publicKeyApi.GetMyProfile();
-      if (profile.Data) {
+      const profile = await this.galaChainApi.isRegistered(
+        client.ethereumAddress,
+      );
+      if (profile.exists) {
         //Good to go
         return;
-        // console.log(`Profile found: ${profile.Data.alias}`);
       } else {
         const registerWallet = await WalletUtils.registerWallet(
           registrationEndpoint,
@@ -188,7 +204,7 @@ export class ProfileService {
           console.warn(registerWallet);
         }
       } else {
-        console.error(e);
+        throw e;
       }
     }
   }

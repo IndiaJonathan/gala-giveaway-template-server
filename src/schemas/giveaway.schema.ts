@@ -1,10 +1,21 @@
 import { TokenClassKeyProperties } from '@gala-chain/api';
 import { Schema, Document } from 'mongoose';
 import { ObjectId } from 'mongodb';
+import { GiveawayTokenType } from '../dtos/giveaway.dto';
+
+export enum GiveawayStatus {
+  Created = 'created',
+  Pending = 'pending',
+  Completed = 'completed',
+  Cancelled = 'cancelled',
+  Errored = 'errored',
+}
 
 export interface Winner {
   gcAddress: string;
   winAmount: string;
+  completed: boolean;
+  error?: string;
 }
 
 export interface GiveawayDocument extends Document {
@@ -16,18 +27,21 @@ export interface GiveawayDocument extends Document {
   claimPerUser?: number; // Required for FCFS
   maxWinners: number;
   usersSignedUp?: string[]; //Required for distributed giveaway
-  distributed?: boolean; //distributed only
+  giveawayStatus: GiveawayStatus;
   creator: ObjectId;
   telegramAuthRequired: boolean;
-  error?: string;
+  giveawayErrors: string[];
   requireBurnTokenToClaim: boolean;
   burnTokenQuantity?: string;
   burnToken?: TokenClassKeyProperties;
+  giveawayTokenType: GiveawayTokenType;
 }
 
 const WinnerSchema = new Schema<Winner>({
   gcAddress: { type: String, required: true },
   winAmount: { type: String, required: true },
+  completed: { type: Boolean, default: false },
+  error: { type: String, required: false },
 });
 
 export const GiveawaySchema = new Schema<GiveawayDocument>({
@@ -44,7 +58,7 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
     category: { type: String, required: true },
     additionalKey: { type: String, required: true },
   },
-  error: { type: String, required: false },
+  giveawayErrors: { type: [String], default: [] },
 
   // For Random Giveaway
   tokenQuantity: {
@@ -85,11 +99,11 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
       return this.giveawayType === 'DistributedGiveway';
     },
   },
-  distributed: {
-    type: Boolean,
-    default: function () {
-      return this.giveawayType === 'DistributedGiveway' ? false : undefined;
-    },
+  giveawayStatus: {
+    type: String,
+    enum: Object.values(GiveawayStatus),
+    default: GiveawayStatus.Created,
+    required: true,
   },
 
   creator: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -111,5 +125,11 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
     required: function (this: GiveawayDocument) {
       return this.requireBurnTokenToClaim === true;
     },
+  },
+
+  giveawayTokenType: {
+    type: String,
+    required: true,
+    enum: ['Balance', 'Allowance'],
   },
 });

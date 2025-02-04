@@ -1,7 +1,7 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { Wallet } from 'ethers';
 import { APP_SECRETS } from '../secrets/secrets.module';
-import { ProfileService } from './profile.service';
+import { ProfileService } from '../profile-module/profile.service';
 
 @Injectable()
 export class StartupService implements OnModuleInit {

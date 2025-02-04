@@ -11,27 +11,30 @@ import {
   Headers,
   UsePipes,
   ValidationPipe,
-  Inject,
+  Param,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { GiveawayDto } from '../dtos/giveaway.dto';
+import { GiveawayDto, GiveawayTokenType } from '../dtos/giveaway.dto';
 import { GiveawayService } from './giveaway.service';
 import { signatures } from '@gala-chain/api';
 import { SignupGiveawayDto } from '../dtos/signup-giveaway.dto';
-import { BabyOpsApi } from '../services/baby-ops.service';
-import { ProfileService } from '../services/profile.service';
+import { GalachainApi } from '../web3-module/galachain.api';
+import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
 import { BurnTokensRequestDto } from '../dtos/ClaimWin.dto';
-import { SignatureService } from '../signature.service';
 import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
+import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
+import { ObjectId } from 'mongodb';
+import { validateSignature } from '../utils/web3wallet';
+import { checkTokenEquality } from '../chain.helper';
+import { GALA_TOKEN } from '../constant';
 
 @Controller('api/giveaway')
 export class GiveawayController {
   constructor(
     private readonly giveawayService: GiveawayService,
-    private tokenService: BabyOpsApi,
+    private tokenService: GalachainApi,
     private profileService: ProfileService,
-    @Inject(SignatureService) private signatureService: SignatureService,
   ) {}
 
   @Post('start')
@@ -44,39 +47,48 @@ export class GiveawayController {
         '',
       );
 
+      if (giveawayDto.endDateTime) {
+        const currentTime = new Date();
+        const oneHourFromNow = new Date(currentTime.getTime() + 60 * 60 * 1000);
+
+        if (new Date(giveawayDto.endDateTime) <= oneHourFromNow) {
+          throw new BadRequestException(
+            'The endDateTime must be at least one hour in the future.',
+          );
+        }
+      }
+
       const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
 
       const account = await this.profileService.findProfileByGC(gc_address);
 
       const availableTokens =
-        await this.giveawayService.getTotalAllowanceQuantity(
+        await this.giveawayService.getNetAvailableTokenQuantity(
           account.giveawayWalletAddress,
-          account.id,
+          account._id as ObjectId,
           giveawayDto.giveawayToken,
+          giveawayDto.giveawayTokenType,
         );
 
-      if (giveawayDto.giveawayType === 'DistributedGiveway') {
-        if (
-          BigNumber(availableTokens.totalQuantity).minus(
-            BigNumber(giveawayDto.tokenQuantity),
-          ) < BigNumber(0)
-        ) {
-          throw new UnauthorizedException(
-            'You need to grant more tokens before you can start this giveaway',
-          );
-        }
-      } else {
-        if (
-          BigNumber(availableTokens.totalQuantity).minus(
-            BigNumber(giveawayDto.claimPerUser).multipliedBy(
+      const tokensToGiveaway = (() => {
+        switch (giveawayDto.giveawayType) {
+          case 'FirstComeFirstServe':
+            return BigNumber(giveawayDto.claimPerUser).multipliedBy(
               giveawayDto.maxWinners,
-            ),
-          ) < BigNumber(0)
-        ) {
-          throw new UnauthorizedException(
-            'You need to grant more tokens before you can start this giveaway',
-          );
+            );
+          case 'DistributedGiveway':
+            return BigNumber(giveawayDto.tokenQuantity).multipliedBy(
+              BigNumber(giveawayDto.maxWinners),
+            );
         }
+      })();
+      if (
+        BigNumber(availableTokens).minus(BigNumber(tokensToGiveaway)) <
+        BigNumber(0)
+      ) {
+        throw new UnauthorizedException(
+          'You need to grant more tokens before you can start this giveaway',
+        );
       }
 
       //todo: ADD this back
@@ -115,13 +127,21 @@ export class GiveawayController {
         return total.plus(item.quantity);
       }, new BigNumber(0));
 
-      const extraAmount =
-        this.giveawayService.getRequiredGalaFeeForGiveaway(giveawayDto);
+      const gasFees =
+        this.giveawayService.getRequiredGalaGasFeeForGiveaway(giveawayDto);
 
-      const currentRequirement =
+      const currentGiveawayEscrows =
         await this.giveawayService.getTotalGalaFeesRequired(account.id);
 
-      const net = galaBalance.minus(extraAmount.plus(currentRequirement));
+      let totalRequirement = gasFees.plus(currentGiveawayEscrows);
+
+      if (giveawayDto.giveawayTokenType === GiveawayTokenType.BALANCE) {
+        if (checkTokenEquality(giveawayDto.giveawayToken, GALA_TOKEN)) {
+          totalRequirement = totalRequirement.plus(tokensToGiveaway);
+        }
+      }
+      const net = galaBalance.minus(totalRequirement);
+
       //todo: unhardcode this from 1, use dry run
       if (net.lt(0)) {
         throw new BadRequestException(
@@ -134,7 +154,7 @@ export class GiveawayController {
         giveawayDto,
       );
       res
-        .status(HttpStatus.OK)
+        .status(HttpStatus.CREATED)
         .json({ success: true, giveaway: createdGiveaway });
     } catch (error) {
       console.error(error);
@@ -160,19 +180,15 @@ export class GiveawayController {
   }
 
   @Get('all')
-  async getAllGiveaways(
+  async getGiveaways(
     @Res() res: Response,
     @Headers('gc-address') gcAddress?: string,
   ) {
     try {
-      const validGcAddress =
-        gcAddress &&
-        (gcAddress.startsWith('client') || gcAddress.startsWith('eth'));
-
-      if (!validGcAddress) throw new Error('Must have gc-address in header');
       const giveaways = await this.giveawayService.getGiveaways(gcAddress);
       res.status(HttpStatus.OK).json(giveaways);
     } catch (error) {
+      console.error(error);
       res.status(HttpStatus.BAD_REQUEST).json({
         success: false,
         message: 'Failed to retrieve giveaways',
@@ -183,7 +199,7 @@ export class GiveawayController {
 
   @Post('fcfs/claim')
   async claimFCFS(@Body() giveawayDto: ClaimFCFSRequestDTO) {
-    const gc_address = this.signatureService.validateSignature(giveawayDto);
+    const gc_address = validateSignature(giveawayDto);
     return this.giveawayService.claimFCFS(giveawayDto, gc_address);
   }
 
@@ -198,7 +214,6 @@ export class GiveawayController {
       );
 
       if (!claimableWin)
-        // const gc_address = 'eth|' + signatures.getEthAddress();
         throw new NotFoundException(
           `Cannot find claimable giveway with this id: ${giveawayDto.claimId}`,
         );
@@ -206,7 +221,7 @@ export class GiveawayController {
         throw new BadRequestException(`Giveaway already claimed`);
       }
 
-      const gc_address = this.signatureService.validateSignature(giveawayDto);
+      const gc_address = validateSignature(giveawayDto);
 
       const profile = await this.profileService.findProfileByGC(gc_address);
 
@@ -216,13 +231,14 @@ export class GiveawayController {
         );
       }
 
+      //todo: handle if already burnt
       const result = await this.tokenService.burnToken(giveawayDto);
       console.log(result);
       if (result.Status === 1) {
         //Good to go
         claimableWin.claimInfo = JSON.stringify(result);
         const mintToken = await this.giveawayService.sendWinnings(
-          profile.id,
+          profile.galaChainAddress,
           new BigNumber(claimableWin.amountWon),
           claimableWin.giveaway,
         );
@@ -245,17 +261,75 @@ export class GiveawayController {
     }
   }
 
-  @Get('active')
-  async getActiveGiveaways(@Res() res: Response) {
-    try {
-      const giveaways = await this.giveawayService.getGiveaways();
-      res.status(HttpStatus.OK).json(giveaways);
-    } catch (error) {
-      res.status(HttpStatus.BAD_REQUEST).json({
-        success: false,
-        message: 'Failed to retrieve giveaways',
-        error,
-      });
-    }
+  @Post('allowance-available/:gcAddress')
+  async getAllowanceAvailable(
+    @Param('gcAddress') gcAddress: string,
+    @Body() tokenClass: TokenInstanceKeyDto,
+  ) {
+    const userInfo = await this.profileService.findProfileByGC(gcAddress);
+
+    const allowances = await this.giveawayService.getNetAvailableTokenQuantity(
+      userInfo.giveawayWalletAddress,
+      userInfo._id as ObjectId,
+      tokenClass,
+      GiveawayTokenType.ALLOWANCE,
+    );
+
+    const galaBalances = await this.tokenService.getBalancesForToken(
+      userInfo.giveawayWalletAddress,
+      tokenClass,
+    );
+
+    //todo: account for locks
+    const galaBalance = galaBalances.Data.reduce((total, item) => {
+      return total.plus(item.quantity);
+    }, new BigNumber(0));
+
+    const currentGalaFeesNeeded =
+      await this.giveawayService.getTotalGalaFeesRequired(userInfo.id);
+
+    return {
+      detailsType: 'Allowance',
+      allowances,
+      galaBalance,
+      giveawayWallet: userInfo.giveawayWalletAddress,
+      currentGalaFeesNeeded,
+    };
+  }
+
+  @Post('balance-available/:gcAddress')
+  async getBalanceAvailable(
+    @Param('gcAddress') gcAddress: string,
+    @Body() tokenClass: TokenInstanceKeyDto,
+  ) {
+    const userInfo = await this.profileService.findProfileByGC(gcAddress);
+    const tokenBalances = await this.tokenService.getBalancesForToken(
+      userInfo.giveawayWalletAddress,
+      tokenClass,
+    );
+    const tokenBalance = tokenBalances.Data.reduce((total, item) => {
+      return total.plus(item.quantity);
+    }, new BigNumber(0));
+
+    const galaBalances = await this.tokenService.getBalancesForToken(
+      userInfo.giveawayWalletAddress,
+      tokenClass,
+    );
+
+    //todo: account for locks
+    const galaBalance = galaBalances.Data.reduce((total, item) => {
+      return total.plus(item.quantity);
+    }, new BigNumber(0));
+
+    const currentGalaFeesNeeded =
+      await this.giveawayService.getTotalGalaFeesRequired(userInfo.id);
+
+    return {
+      detailsType: 'Balance',
+      tokenBalance,
+      galaBalance,
+      giveawayWallet: userInfo.giveawayWalletAddress,
+      currentGalaFeesNeeded,
+    };
   }
 }

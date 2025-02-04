@@ -7,16 +7,15 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { GiveawayDocument, Winner } from '../schemas/giveaway.schema';
 import {
-  signatures,
-  TokenAllowance,
-  TokenClassKey,
-  TokenClassKeyProperties,
-} from '@gala-chain/api';
-import { ProfileService } from '../services/profile.service';
+  GiveawayDocument,
+  GiveawayStatus,
+  Winner,
+} from '../schemas/giveaway.schema';
+import { signatures, TokenClassKeyProperties } from '@gala-chain/api';
+import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
-import { GiveawayDto } from '../dtos/giveaway.dto';
+import { GiveawayDto, GiveawayTokenType } from '../dtos/giveaway.dto';
 import { MAX_ITERATIONS as MAX_WINNERS } from '../constant';
 import { ClaimableWinDocument } from '../schemas/ClaimableWin.schema';
 import { APP_SECRETS } from '../secrets/secrets.module';
@@ -30,8 +29,9 @@ import { ObjectId } from 'mongodb';
 import { checksumGCAddress, tokenToReadable } from '../chain.helper';
 import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
 import { BurnTokenQuantityDto } from '../dtos/BurnTokenQuantity.dto';
-import { BabyOpsApi } from '../services/baby-ops.service';
+import { GalachainApi } from '../web3-module/galachain.api';
 import { PaymentStatusDocument } from '../schemas/PaymentStatusSchema';
+import { WalletService } from '../web3-module/wallet.service';
 
 @Injectable()
 export class GiveawayService {
@@ -43,7 +43,8 @@ export class GiveawayService {
     @InjectModel('PaymentStatus') // Inject the Mongoose model for Profile
     private readonly paymentStatusModel: Model<PaymentStatusDocument>,
     private profileService: ProfileService,
-    @Inject(BabyOpsApi) private tokenService: BabyOpsApi,
+    @Inject(GalachainApi) private galachainApi: GalachainApi,
+    @Inject(WalletService) private walletService: WalletService,
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
   ) {}
 
@@ -137,7 +138,10 @@ export class GiveawayService {
     return this.giveawayModel
       .find({
         creator,
-        $or: [{ distributed: false }, { endDateTime: { $gte: currentDate } }],
+        $or: [
+          { giveawayStatus: false },
+          { endDateTime: { $gte: currentDate } },
+        ],
         ...(tokenClass && {
           'giveawayToken.collection': tokenClass.collection,
           'giveawayToken.category': tokenClass.category,
@@ -151,7 +155,7 @@ export class GiveawayService {
     const currentDate = new Date();
     return this.giveawayModel
       .find({
-        distributed: false,
+        giveawayStatus: GiveawayStatus.Created,
         giveawayType: 'DistributedGiveway',
         endDateTime: { $lt: currentDate },
       })
@@ -283,6 +287,7 @@ export class GiveawayService {
         gcAddress,
         winAmount: winCount.toString(),
         isDistributed: false,
+        completed: false,
       }),
     );
 
@@ -297,7 +302,6 @@ export class GiveawayService {
     if (giveaway.telegramAuthRequired) {
       const getProfile = await this.profileService.findProfileByGC(
         checksumGCAddress(gcAddress),
-        true,
       );
       if (giveaway.telegramAuthRequired && !getProfile.telegramId) {
         throw new BadRequestException(
@@ -412,7 +416,7 @@ export class GiveawayService {
     if (giveaway.burnToken) {
       this.runBurnChecks(giveaway, claimDto.tokenInstances);
 
-      const result = await this.tokenService.burnToken(claimDto);
+      const result = await this.galachainApi.burnToken(claimDto);
       console.log(result);
       if (result.Status !== 1) {
         throw new BadRequestException(
@@ -423,16 +427,18 @@ export class GiveawayService {
       paymentStatus.burnInfo = JSON.stringify(paymentStatus);
       await paymentStatus.save();
     }
-    giveaway.winners.push({
-      gcAddress,
-      winAmount: giveaway.claimPerUser.toString(),
-    });
-    await giveaway.save();
+
     const sendResult = await this.sendWinnings(
       gcAddress,
       new BigNumber(giveaway.claimPerUser),
       giveaway,
     );
+    giveaway.winners.push({
+      gcAddress,
+      winAmount: giveaway.claimPerUser.toString(),
+      completed: true,
+    });
+    await giveaway.save();
     paymentStatus.winningInfo = JSON.stringify(sendResult);
     await paymentStatus.save();
     if (sendResult.Status === 1) {
@@ -475,10 +481,15 @@ export class GiveawayService {
     }
   }
 
-  getRequiredGalaFeeForGiveaway(giveaway: GiveawayDocument | GiveawayDto) {
+  getRequiredGalaGasFeeForGiveaway(giveaway: GiveawayDocument | GiveawayDto) {
     switch (giveaway.giveawayType) {
       case 'DistributedGiveway':
-        return BigNumber(1);
+        switch (giveaway.giveawayTokenType) {
+          case GiveawayTokenType.BALANCE:
+            return BigNumber(1).multipliedBy(giveaway.maxWinners);
+          case GiveawayTokenType.ALLOWANCE:
+            return BigNumber(1);
+        }
       case 'FirstComeFirstServe':
         //todo run dryrun
         return BigNumber(
@@ -491,7 +502,9 @@ export class GiveawayService {
     const undistributedGiveways = await this.findUndistributed(ownerId);
     const totalGalaFee = undistributedGiveways.reduce(
       (accumulator, giveaway) => {
-        const fee = new BigNumber(this.getRequiredGalaFeeForGiveaway(giveaway));
+        const fee = new BigNumber(
+          this.getRequiredGalaGasFeeForGiveaway(giveaway),
+        );
         return accumulator.plus(fee);
       },
       new BigNumber(0),
@@ -499,46 +512,56 @@ export class GiveawayService {
     return totalGalaFee;
   }
 
-  async getTotalAllowanceQuantity(
+  async getNetAvailableTokenQuantity(
     giveawayWalletAddress: string,
     ownerId: ObjectId,
-    tokenClassKey: TokenClassKey,
+    tokenClassKey: TokenClassKeyProperties,
+    giveawayTokenType: GiveawayTokenType,
   ) {
-    const allowances = await this.tokenService.getAllowancesForToken(
-      giveawayWalletAddress,
+    let totalQuantity: BigNumber;
+    if (giveawayTokenType === GiveawayTokenType.ALLOWANCE) {
+      totalQuantity = await this.walletService.getAllowanceQuantity(
+        giveawayWalletAddress,
+        tokenClassKey,
+      );
+    } else if (giveawayTokenType === GiveawayTokenType.BALANCE) {
+      totalQuantity = await this.walletService.getBalanceQuantity(
+        giveawayWalletAddress,
+        tokenClassKey,
+      );
+    }
+
+    const undistributedGiveways = await this.findUndistributed(
+      ownerId,
       tokenClassKey,
     );
 
-    let totalQuantity = BigNumber(0);
-    let unusableQuantity = BigNumber(0);
-    if ((allowances as any).Data) {
-      //Seems like local wants results, but stage/prod don't
-      //TODO: look into this
-      const allowanceData =
-        (allowances as any).Data?.results || allowances.Data;
-      (allowanceData as TokenAllowance[]).forEach((tokenAllowance) => {
-        const quantityAvailable = BigNumber(tokenAllowance.quantity).minus(
-          BigNumber(tokenAllowance.quantitySpent),
-        );
-        const usesAvailable = BigNumber(tokenAllowance.uses).minus(
-          BigNumber(tokenAllowance.usesSpent),
-        );
-
-        if (quantityAvailable < usesAvailable) {
-          //Handling it this way to ensure that the available quantity can work with available uses
-          const useableQuantity = quantityAvailable.minus(usesAvailable);
-          totalQuantity = totalQuantity.plus(useableQuantity);
-
-          unusableQuantity = unusableQuantity.plus(
-            quantityAvailable.minus(useableQuantity),
-          );
-
-          //TODO: Handle the full quantity if possible
-        } else {
-          totalQuantity = totalQuantity.plus(quantityAvailable);
+    undistributedGiveways
+      .filter((giveaway) => giveaway.giveawayTokenType === giveawayTokenType)
+      .forEach((giveaway) => {
+        switch (giveaway.giveawayType) {
+          case 'DistributedGiveway':
+            totalQuantity = BigNumber(totalQuantity).minus(
+              giveaway.tokenQuantity,
+            );
+            break;
+          case 'FirstComeFirstServe':
+            totalQuantity = BigNumber(totalQuantity).minus(giveaway.maxWinners);
         }
       });
-    }
+
+    return totalQuantity;
+  }
+
+  async getNetBalanceQuantity(
+    giveawayWalletAddress: string,
+    ownerId: ObjectId,
+    tokenClassKey: TokenClassKeyProperties,
+  ) {
+    let totalQuantity = await this.walletService.getAllowanceQuantity(
+      giveawayWalletAddress,
+      tokenClassKey,
+    );
 
     const undistributedGiveways = await this.findUndistributed(
       ownerId,
@@ -557,6 +580,6 @@ export class GiveawayService {
       }
     });
 
-    return { totalQuantity, unusableQuantity };
+    return totalQuantity;
   }
 }
