@@ -452,10 +452,3 @@ describe('Giveaway Controller (e2e)', () => {
     );
   }
 });
-
-/**
- *     giveawayWalletAddress: string,
-    ownerId: ObjectId,
-    tokenClassKey: TokenClassKeyProperties,
-    giveawayTokenType: GiveawayTokenType,
- */

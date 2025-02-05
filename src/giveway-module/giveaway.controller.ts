@@ -5,7 +5,6 @@ import {
   Post,
   Res,
   HttpStatus,
-  UnauthorizedException,
   NotFoundException,
   BadRequestException,
   Headers,
