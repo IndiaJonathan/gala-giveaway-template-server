@@ -446,22 +446,6 @@ export class GiveawayService {
     }
   }
 
-  // async getAllActiveGiveaways(): Promise<GiveawayDocument[]> {
-  //   const currentDate = new Date();
-  //   return this.giveawayModel
-  //     .find({ endDateTime: { $gt: currentDate } })
-  //     .exec();
-  // }
-
-  // async distributeClaim(
-  //   giveawayModel: GiveawayDocument,
-  // ): Promise<GiveawayDocument[]> {
-  //   giveawayModel.claimPerUser
-  //   return this.giveawayModel
-  //     .find({ endDateTime: { $gt: currentDate } })
-  //     .exec();
-  // }
-
   async validateGiveawayIsActive(giveawayId: string): Promise<void> {
     const currentDate = new Date();
 
@@ -477,6 +461,46 @@ export class GiveawayService {
         `Giveaway ${giveawayId} is not active or not found`,
       );
     }
+  }
+
+  getRequiredTokensForGiveaway(giveaway: GiveawayDocument | GiveawayDto) {
+    switch (giveaway.giveawayType) {
+      case 'FirstComeFirstServe':
+        return BigNumber(giveaway.claimPerUser).multipliedBy(
+          giveaway.maxWinners,
+        );
+      case 'DistributedGiveway':
+        return BigNumber(giveaway.tokenQuantity).multipliedBy(
+          BigNumber(giveaway.maxWinners),
+        );
+    }
+  }
+
+  async getTotalRequiredTokensAndEscrow(
+    ownerId: ObjectId,
+    giveaway?: GiveawayDocument | GiveawayDto,
+  ) {
+    const undistributedGiveways = await this.findUndistributed(
+      ownerId,
+      giveaway.giveawayToken,
+    );
+    let totalTokensRequired = undistributedGiveways.reduce(
+      (accumulator, giveaway) => {
+        const tokens = new BigNumber(
+          this.getRequiredTokensForGiveaway(giveaway),
+        );
+        return accumulator.plus(tokens);
+      },
+      new BigNumber(0),
+    );
+
+    if (giveaway) {
+      totalTokensRequired = totalTokensRequired.plus(
+        this.getRequiredTokensForGiveaway(giveaway),
+      );
+    }
+
+    return totalTokensRequired;
   }
 
   getRequiredGalaGasFeeForGiveaway(giveaway: GiveawayDocument | GiveawayDto) {
@@ -496,17 +520,24 @@ export class GiveawayService {
     }
   }
 
-  async getTotalGalaFeesRequired(ownerId: ObjectId) {
+  async getTotalGalaFeesRequiredPlusEscrow(
+    ownerId: ObjectId,
+    giveaway?: GiveawayDocument | GiveawayDto,
+  ) {
     const undistributedGiveways = await this.findUndistributed(ownerId);
-    const totalGalaFee = undistributedGiveways.reduce(
-      (accumulator, giveaway) => {
-        const fee = new BigNumber(
-          this.getRequiredGalaGasFeeForGiveaway(giveaway),
-        );
-        return accumulator.plus(fee);
-      },
-      new BigNumber(0),
-    );
+    let totalGalaFee = undistributedGiveways.reduce((accumulator, giveaway) => {
+      const fee = new BigNumber(
+        this.getRequiredGalaGasFeeForGiveaway(giveaway),
+      );
+      return accumulator.plus(fee);
+    }, new BigNumber(0));
+
+    if (giveaway) {
+      totalGalaFee = totalGalaFee.plus(
+        this.getRequiredGalaGasFeeForGiveaway(giveaway),
+      );
+    }
+
     return totalGalaFee;
   }
 

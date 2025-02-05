@@ -72,20 +72,14 @@ export class GiveawayController {
           giveawayDto.giveawayTokenType,
         );
 
-      const tokensToGiveaway = (() => {
-        switch (giveawayDto.giveawayType) {
-          case 'FirstComeFirstServe':
-            return BigNumber(giveawayDto.claimPerUser).multipliedBy(
-              giveawayDto.maxWinners,
-            );
-          case 'DistributedGiveway':
-            return BigNumber(giveawayDto.tokenQuantity).multipliedBy(
-              BigNumber(giveawayDto.maxWinners),
-            );
-        }
-      })();
+      //Includes escrow
+      const tokensNeeded =
+        await this.giveawayService.getTotalRequiredTokensAndEscrow(
+          account.id,
+          giveawayDto,
+        );
       const tokenDiff = BigNumber(availableTokens).minus(
-        BigNumber(tokensToGiveaway),
+        BigNumber(tokensNeeded),
       );
       if (tokenDiff.lt(0)) {
         switch (giveawayDto.giveawayTokenType) {
@@ -136,17 +130,17 @@ export class GiveawayController {
         return total.plus(item.quantity);
       }, new BigNumber(0));
 
-      const gasFees =
-        this.giveawayService.getRequiredGalaGasFeeForGiveaway(giveawayDto);
+      const requiredGas =
+        await this.giveawayService.getTotalGalaFeesRequiredPlusEscrow(
+          account.id,
+          giveawayDto,
+        );
 
-      const currentGiveawayEscrows =
-        await this.giveawayService.getTotalGalaFeesRequired(account.id);
-
-      let totalGalaRequirement = gasFees.plus(currentGiveawayEscrows);
+      let totalGalaRequirement = requiredGas;
 
       if (giveawayDto.giveawayTokenType === GiveawayTokenType.BALANCE) {
         if (checkTokenEquality(giveawayDto.giveawayToken, GALA_TOKEN)) {
-          totalGalaRequirement = totalGalaRequirement.plus(tokensToGiveaway);
+          totalGalaRequirement = totalGalaRequirement.plus(tokensNeeded);
         }
       }
       const net = galaBalance.minus(totalGalaRequirement);
@@ -291,7 +285,9 @@ export class GiveawayController {
     }, new BigNumber(0));
 
     const currentGalaFeesNeeded =
-      await this.giveawayService.getTotalGalaFeesRequired(userInfo.id);
+      await this.giveawayService.getTotalGalaFeesRequiredPlusEscrow(
+        userInfo.id,
+      );
 
     return {
       detailsType: 'Allowance',
@@ -327,7 +323,9 @@ export class GiveawayController {
     }, new BigNumber(0));
 
     const currentGalaFeesNeeded =
-      await this.giveawayService.getTotalGalaFeesRequired(userInfo.id);
+      await this.giveawayService.getTotalGalaFeesRequiredPlusEscrow(
+        userInfo.id,
+      );
 
     return {
       detailsType: 'Balance',

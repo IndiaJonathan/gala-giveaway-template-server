@@ -278,21 +278,14 @@ describe('Giveaway Controller (e2e)', () => {
     expect(balances.Data[0].quantity).toBe(1);
   });
 
-  it('should not work for a giveaway if granted allowance is insufficient ', async () => {
+  it('should not work for a giveaway if balance is tied up in other giveaways', async () => {
     const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
       await createUser();
-
-    mockGalachainApi.grantAllowancesForToken(
-      giveawayCreatorProfile.giveawayWalletAddress,
-      giveawayCreatorProfile.galaChainAddress,
-      GALA_TOKEN,
-      1,
-    );
 
     mockGalachainApi.grantBalanceForToken(
       giveawayCreatorProfile.giveawayWalletAddress,
       GALA_TOKEN,
-      1,
+      3,
     );
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
@@ -304,6 +297,20 @@ describe('Giveaway Controller (e2e)', () => {
       .post('/api/giveaway/start')
       .set('Content-Type', 'application/json')
       .send(signedPayload)
+      .expect((res) => {
+        expect(res.body).toMatchObject({ success: true });
+      })
+      .expect(201);
+
+    const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
+      ...startBalanceGiveaway,
+      tokenQuantity: 1,
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload2)
       .expect((res) => {
         expect(res.body).toMatchObject({ success: false });
       })
