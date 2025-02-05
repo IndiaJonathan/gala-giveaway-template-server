@@ -5,7 +5,6 @@ import { ProfileService } from '../profile-module/profile.service';
 import {
   GalaChainResponseError,
   SigningClient,
-  TokenApi,
   WalletUtils,
 } from '@gala-chain/connect';
 import { APP_SECRETS } from '../secrets/secrets.module';
