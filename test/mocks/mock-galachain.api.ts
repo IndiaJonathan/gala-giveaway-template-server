@@ -111,9 +111,9 @@ export class MockGalachainApi implements OnModuleInit {
     ownerAddress: string,
     tokenClassKey: TokenInstanceKeyDto,
   ) {
-    const tokenBalances =
-      this.tokenBalances[ownerAddress] ||
-      [].filter((balance) => checkTokenEquality(balance, tokenClassKey));
+    const tokenBalances = (this.tokenBalances[ownerAddress] || []).filter(
+      (balance) => checkTokenEquality(balance, tokenClassKey),
+    );
     return {
       success: true,
       Data: tokenBalances || [],
@@ -124,11 +124,9 @@ export class MockGalachainApi implements OnModuleInit {
     ownerAddress: string,
     tokenClassKey: TokenClassKeyProperties,
   ) {
-    const tokenAllowances =
-      this.allowances[ownerAddress] ||
-      [].filter((allowance) =>
-        checkTokenEquality(allowance.tokenClass, tokenClassKey),
-      );
+    const tokenAllowances = (this.allowances[ownerAddress] || []).filter(
+      (allowance) => checkTokenEquality(allowance.tokenClass, tokenClassKey),
+    );
     return {
       success: true,
       Data: tokenAllowances || [],

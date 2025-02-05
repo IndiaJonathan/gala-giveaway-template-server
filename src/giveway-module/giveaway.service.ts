@@ -530,13 +530,11 @@ export class GiveawayService {
   ) {
     const undistributedGiveways = await this.findUndistributed(ownerId);
     let totalGalaFee = undistributedGiveways.reduce((accumulator, giveaway) => {
-      const fee = new BigNumber(
-        this.getRequiredGalaGasFeeForGiveaway(giveaway),
-      );
+      let fee = new BigNumber(this.getRequiredGalaGasFeeForGiveaway(giveaway));
 
       if (checkTokenEquality(giveaway.giveawayToken, GALA_TOKEN)) {
         //If the user is giving away gala, this should be accounted for
-        fee.plus(this.getRequiredTokensForGiveaway(giveaway));
+        fee = fee.plus(this.getRequiredTokensForGiveaway(giveaway));
       }
       return accumulator.plus(fee);
     }, new BigNumber(0));
