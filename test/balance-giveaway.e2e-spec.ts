@@ -317,6 +317,98 @@ describe('Giveaway Controller (e2e)', () => {
       .expect(400);
   });
 
+  it('should fail for a giveaway if gas fees are tied up in a giveaway using GALA', async () => {
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
+      await createUser();
+
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      GALA_TOKEN,
+      3,
+    );
+
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      { ...GALA_TOKEN, collection: 'GALA2' },
+      3,
+    );
+
+    const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
+      ...startBalanceGiveaway,
+      tokenQuantity: 2,
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect((res) => {
+        expect(res.body).toMatchObject({ success: true });
+      })
+      .expect(201);
+
+    const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
+      ...startBalanceGiveaway,
+      tokenQuantity: 2,
+      giveawayToken: { ...GALA_TOKEN, collection: 'GALA2' }, //electric boogaloo
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload2)
+      .expect((res) => {
+        expect(res.body).toMatchObject({ success: false });
+      })
+      .expect(400);
+  });
+
+  it('should work for a giveaway if balance is tied up in an unrelated escrow', async () => {
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
+      await createUser();
+
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      GALA_TOKEN,
+      4,
+    );
+
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      { ...GALA_TOKEN, collection: 'GALA2' },
+      3,
+    );
+
+    const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
+      ...startBalanceGiveaway,
+      tokenQuantity: 2,
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect((res) => {
+        expect(res.body).toMatchObject({ success: true });
+      })
+      .expect(201);
+
+    const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
+      ...startBalanceGiveaway,
+      tokenQuantity: 2,
+      giveawayToken: { ...GALA_TOKEN, collection: 'GALA2' }, //electric boogaloo
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload2)
+      .expect((res) => {
+        expect(res.body).toMatchObject({ success: true });
+      })
+      .expect(201);
+  });
+
   it('should be unable to create a balance giveaway with insuffucient balance', async () => {
     const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
       await createUser();

@@ -16,7 +16,7 @@ import { signatures, TokenClassKeyProperties } from '@gala-chain/api';
 import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
 import { GiveawayDto, GiveawayTokenType } from '../dtos/giveaway.dto';
-import { MAX_ITERATIONS as MAX_WINNERS } from '../constant';
+import { GALA_TOKEN, MAX_ITERATIONS as MAX_WINNERS } from '../constant';
 import { ClaimableWinDocument } from '../schemas/ClaimableWin.schema';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import {
@@ -26,7 +26,11 @@ import {
   TokenApi,
 } from '@gala-chain/connect';
 import { ObjectId } from 'mongodb';
-import { checksumGCAddress, tokenToReadable } from '../chain.helper';
+import {
+  checksumGCAddress,
+  checkTokenEquality,
+  tokenToReadable,
+} from '../chain.helper';
 import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
 import { BurnTokenQuantityDto } from '../dtos/BurnTokenQuantity.dto';
 import { GalachainApi } from '../web3-module/galachain.api';
@@ -529,6 +533,11 @@ export class GiveawayService {
       const fee = new BigNumber(
         this.getRequiredGalaGasFeeForGiveaway(giveaway),
       );
+
+      if (checkTokenEquality(giveaway.giveawayToken, GALA_TOKEN)) {
+        //If the user is giving away gala, this should be accounted for
+        fee.plus(this.getRequiredTokensForGiveaway(giveaway));
+      }
       return accumulator.plus(fee);
     }, new BigNumber(0));
 
