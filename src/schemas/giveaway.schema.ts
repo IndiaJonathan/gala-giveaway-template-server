@@ -20,7 +20,7 @@ export interface Winner {
 
 export interface GiveawayDocument extends Document {
   endDateTime: Date;
-  giveawayType: 'FirstComeFirstServe' | 'DistributedGiveway';
+  giveawayType: 'FirstComeFirstServe' | 'DistributedGiveaway';
   giveawayToken: TokenClassKeyProperties;
   tokenQuantity?: string; // Optional for FCFS
   winners: Winner[];
@@ -48,7 +48,7 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
   giveawayType: {
     type: String,
     required: true,
-    enum: ['FirstComeFirstServe', 'DistributedGiveway'],
+    enum: ['FirstComeFirstServe', 'DistributedGiveaway'],
   },
   endDateTime: { type: Date, required: true },
   telegramAuthRequired: { type: Boolean, required: false, default: false },
@@ -64,7 +64,7 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
   tokenQuantity: {
     type: String,
     required: function (this: GiveawayDocument) {
-      return this.giveawayType === 'DistributedGiveway';
+      return this.giveawayType === 'DistributedGiveaway';
     },
   },
   winners: {
@@ -86,7 +86,7 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
   usersSignedUp: {
     type: [String],
     default: function () {
-      return this.giveawayType === 'DistributedGiveway' ? [] : undefined;
+      return this.giveawayType === 'DistributedGiveaway' ? [] : undefined;
     },
     validate: {
       validator: function (values: string[]) {
@@ -96,7 +96,7 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
         `${props.value} is invalid. The address must start with "eth|".`,
     },
     required: function (this: GiveawayDocument) {
-      return this.giveawayType === 'DistributedGiveway';
+      return this.giveawayType === 'DistributedGiveaway';
     },
   },
   giveawayStatus: {

@@ -30,6 +30,7 @@ import {
 } from '../utils/web3wallet';
 import { checkTokenEquality } from '../chain.helper';
 import { GALA_TOKEN } from '../constant';
+import { GasFeeEstimateRequestDto } from '../dtos/GasFeeEstimateRequest.dto';
 
 @Controller('api/giveaway')
 export class GiveawayController {
@@ -178,6 +179,11 @@ export class GiveawayController {
     return signupResult;
   }
 
+  @Post('estimate-fee')
+  async estimateFee(@Body() gasFeeDto: GasFeeEstimateRequestDto) {
+    return this.giveawayService.getRequiredGalaGasFeeForGiveaway(gasFeeDto);
+  }
+
   @Get('all')
   async getGiveaways(
     @Res() res: Response,
@@ -260,8 +266,8 @@ export class GiveawayController {
     }
   }
 
-  @Post('allowance-available/:gcAddress')
-  async getAllowanceAvailable(
+  @Post('tokens-available/:gcAddress')
+  async getTokensAvailable(
     @Param('gcAddress') gcAddress: string,
     @Body() tokenClass: TokenInstanceKeyDto,
   ) {
@@ -274,36 +280,6 @@ export class GiveawayController {
       GiveawayTokenType.ALLOWANCE,
     );
 
-    const galaBalances = await this.tokenService.getBalancesForToken(
-      userInfo.giveawayWalletAddress,
-      tokenClass,
-    );
-
-    //todo: account for locks
-    const galaBalance = galaBalances.Data.reduce((total, item) => {
-      return total.plus(item.quantity);
-    }, new BigNumber(0));
-
-    const currentGalaFeesNeeded =
-      await this.giveawayService.getTotalGalaFeesRequiredPlusEscrow(
-        userInfo.id,
-      );
-
-    return {
-      detailsType: 'Allowance',
-      allowances,
-      galaBalance,
-      giveawayWallet: userInfo.giveawayWalletAddress,
-      currentGalaFeesNeeded,
-    };
-  }
-
-  @Post('balance-available/:gcAddress')
-  async getBalanceAvailable(
-    @Param('gcAddress') gcAddress: string,
-    @Body() tokenClass: TokenInstanceKeyDto,
-  ) {
-    const userInfo = await this.profileService.findProfileByGC(gcAddress);
     const tokenBalances = await this.tokenService.getBalancesForToken(
       userInfo.giveawayWalletAddress,
       tokenClass,
@@ -328,11 +304,52 @@ export class GiveawayController {
       );
 
     return {
-      detailsType: 'Balance',
+      allowances,
       tokenBalance,
       galaBalance,
       giveawayWallet: userInfo.giveawayWalletAddress,
       currentGalaFeesNeeded,
     };
+  }
+
+  @Get('claimable-wins/:gcAddress')
+  async getClaimableWins(
+    @Param('gcAddress') gcAddress: string,
+    @Res() res: Response,
+  ) {
+    try {
+      const claimableWins =
+        await this.giveawayService.getClaimableWins(gcAddress);
+
+      res.status(HttpStatus.OK).json(claimableWins);
+    } catch (error) {
+      console.error(error);
+      res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: 'Failed to retrieve claimable wins',
+        error,
+      });
+    }
+  }
+
+  @Get('user-wins/:gcAddress')
+  async getUserWins(
+    @Param('gcAddress') gcAddress: string,
+    @Res() res: Response,
+  ) {
+    try {
+      // Get giveaways where the user is a winner directly from the service
+      const userWonGiveaways =
+        await this.giveawayService.getUserWonGiveaways(gcAddress);
+
+      res.status(HttpStatus.OK).json(userWonGiveaways);
+    } catch (error) {
+      console.error(error);
+      res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: 'Failed to retrieve user wins',
+        error,
+      });
+    }
   }
 }

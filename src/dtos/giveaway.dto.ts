@@ -56,10 +56,6 @@ export class BasicGiveawaySettingsDto {
   maxWinners: number;
 
   @IsNotEmpty()
-  @IsNumberString()
-  winners: string;
-
-  @IsNotEmpty()
   @IsEnum(GiveawayTokenType, {
     message: 'GiveawayTokenType must be one of: Balance, Allowance',
   })
@@ -83,7 +79,7 @@ export class RandomGiveawaySettingsDto extends BasicGiveawaySettingsDto {
 
   @IsNotEmpty()
   @IsString()
-  giveawayType: 'DistributedGiveway';
+  giveawayType: 'DistributedGiveaway';
 }
 
 export type GiveawayDto =

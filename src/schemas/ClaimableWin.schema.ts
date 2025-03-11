@@ -1,7 +1,7 @@
 import { Document, Schema, model } from 'mongoose';
 import { GiveawayDocument } from './giveaway.schema';
 
-export interface ClaimableWinDocument extends Document {
+export interface WinDocument extends Document {
   giveaway: GiveawayDocument;
   amountWon: number;
   gcAddress: string;
@@ -9,7 +9,7 @@ export interface ClaimableWinDocument extends Document {
   claimInfo: string;
 }
 
-export const ClaimableWinSchema = new Schema<ClaimableWinDocument>({
+export const WinSchema = new Schema<WinDocument>({
   giveaway: { type: Schema.Types.ObjectId, ref: 'Giveaway', required: true },
   amountWon: { type: Number, required: true },
   gcAddress: { type: String, required: true },
@@ -17,7 +17,4 @@ export const ClaimableWinSchema = new Schema<ClaimableWinDocument>({
   claimed: { type: Boolean, default: false },
 });
 
-export const ClaimableWin = model<ClaimableWinDocument>(
-  'ClaimableWin',
-  ClaimableWinSchema,
-);
+export const Win = model<WinDocument>('Win', WinSchema);

@@ -3,7 +3,7 @@ import { GiveawaySchema } from '../schemas/giveaway.schema';
 import { ProfileSchema } from '../schemas/ProfileSchema';
 import { APP_SECRETS, SecretConfigModule } from '../secrets/secrets.module';
 import { Module } from '@nestjs/common';
-import { ClaimableWinSchema } from '../schemas/ClaimableWin.schema';
+import { WinSchema } from '../schemas/ClaimableWin.schema';
 import { PaymentStatusSchema } from '../schemas/PaymentStatusSchema';
 
 @Module({
@@ -25,7 +25,7 @@ import { PaymentStatusSchema } from '../schemas/PaymentStatusSchema';
     MongooseModule.forFeature([
       { name: 'Profile', schema: ProfileSchema },
       { name: 'Giveaway', schema: GiveawaySchema },
-      { name: 'ClaimableWin', schema: ClaimableWinSchema },
+      { name: 'Win', schema: WinSchema },
       { name: 'PaymentStatus', schema: PaymentStatusSchema },
     ]),
   ],

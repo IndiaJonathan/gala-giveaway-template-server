@@ -17,7 +17,7 @@ import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
 import { GiveawayDto, GiveawayTokenType } from '../dtos/giveaway.dto';
 import { GALA_TOKEN, MAX_ITERATIONS as MAX_WINNERS } from '../constant';
-import { ClaimableWinDocument } from '../schemas/ClaimableWin.schema';
+import { WinDocument } from '../schemas/ClaimableWin.schema';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import {
   GalaChainBaseApi,
@@ -36,14 +36,15 @@ import { BurnTokenQuantityDto } from '../dtos/BurnTokenQuantity.dto';
 import { GalachainApi } from '../web3-module/galachain.api';
 import { PaymentStatusDocument } from '../schemas/PaymentStatusSchema';
 import { WalletService } from '../web3-module/wallet.service';
+import { GasFeeEstimateRequestDto } from '../dtos/GasFeeEstimateRequest.dto';
 
 @Injectable()
 export class GiveawayService {
   constructor(
     @InjectModel('Giveaway')
     private readonly giveawayModel: Model<GiveawayDocument>,
-    @InjectModel('ClaimableWin')
-    private readonly claimableWinModel: Model<ClaimableWinDocument>,
+    @InjectModel('Win')
+    private readonly claimableWinModel: Model<WinDocument>,
     @InjectModel('PaymentStatus') // Inject the Mongoose model for Profile
     private readonly paymentStatusModel: Model<PaymentStatusDocument>,
     private profileService: ProfileService,
@@ -133,6 +134,46 @@ export class GiveawayService {
     });
   }
 
+  /**
+   * Find all giveaways where the user with the provided GC address is a winner
+   * @param gcAddress The user's GC address
+   * @returns Array of giveaways where the user is a winner
+   */
+  async getUserWonGiveaways(gcAddress: string): Promise<any[]> {
+    const claimableWins = await this.claimableWinModel
+      .find({ gcAddress })
+      .populate('giveaway')
+      .lean()
+      .exec();
+
+    // Transform the claimable wins to include only required giveaway information
+    return claimableWins
+      .map((win) => {
+        const { giveaway, ...claimableWinData } = win;
+
+        if (!giveaway) {
+          return null;
+        }
+        // Extract only the requested fields from giveaway
+        const filteredGiveaway = {
+          endDateTime: giveaway.endDateTime,
+          giveawayType: giveaway.giveawayType,
+          giveawayToken: giveaway.giveawayToken,
+          tokenQuantity: giveaway.tokenQuantity,
+          creator: giveaway.creator,
+          burnToken: giveaway.burnToken,
+          burnTokenQuantity: giveaway.burnTokenQuantity,
+        };
+
+        // Return claimable win data with filtered giveaway data
+        return {
+          ...claimableWinData,
+          giveaway: filteredGiveaway,
+        };
+      })
+      .filter((win) => win !== null);
+  }
+
   async findUndistributed(
     creator: ObjectId,
     tokenClass?: TokenClassKeyProperties,
@@ -160,7 +201,7 @@ export class GiveawayService {
     return this.giveawayModel
       .find({
         giveawayStatus: GiveawayStatus.Created,
-        giveawayType: 'DistributedGiveway',
+        giveawayType: 'DistributedGiveaway',
         endDateTime: { $lt: currentDate },
       })
       .exec();
@@ -359,9 +400,9 @@ export class GiveawayService {
     if (giveaway.usersSignedUp.includes(checksumGCAddress(gcAddress))) {
       throw new BadRequestException(`You're already signed up!`);
     }
-    if (giveaway.giveawayType !== 'DistributedGiveway') {
+    if (giveaway.giveawayType !== 'DistributedGiveaway') {
       throw new BadRequestException(
-        'Giveaway is not of type DistributedGiveway',
+        'Giveaway is not of type DistributedGiveaway',
       );
     }
 
@@ -473,7 +514,7 @@ export class GiveawayService {
         return BigNumber(giveaway.claimPerUser).multipliedBy(
           giveaway.maxWinners,
         );
-      case 'DistributedGiveway':
+      case 'DistributedGiveaway':
         return BigNumber(giveaway.tokenQuantity).multipliedBy(
           BigNumber(giveaway.maxWinners),
         );
@@ -484,11 +525,11 @@ export class GiveawayService {
     ownerId: ObjectId,
     giveaway?: GiveawayDocument | GiveawayDto,
   ) {
-    const undistributedGiveways = await this.findUndistributed(
+    const unDistributedGiveaways = await this.findUndistributed(
       ownerId,
       giveaway.giveawayToken,
     );
-    let totalTokensRequired = undistributedGiveways.reduce(
+    let totalTokensRequired = unDistributedGiveaways.reduce(
       (accumulator, giveaway) => {
         const tokens = new BigNumber(
           this.getRequiredTokensForGiveaway(giveaway),
@@ -507,9 +548,11 @@ export class GiveawayService {
     return totalTokensRequired;
   }
 
-  getRequiredGalaGasFeeForGiveaway(giveaway: GiveawayDocument | GiveawayDto) {
+  getRequiredGalaGasFeeForGiveaway(giveaway: GasFeeEstimateRequestDto) {
     switch (giveaway.giveawayType) {
-      case 'DistributedGiveway':
+      //todo run dryrun
+
+      case 'DistributedGiveaway':
         switch (giveaway.giveawayTokenType) {
           case GiveawayTokenType.BALANCE:
             return BigNumber(1).multipliedBy(giveaway.maxWinners);
@@ -517,10 +560,7 @@ export class GiveawayService {
             return BigNumber(1);
         }
       case 'FirstComeFirstServe':
-        //todo run dryrun
-        return BigNumber(
-          giveaway.maxWinners - (giveaway?.winners?.length || 0),
-        );
+        return BigNumber(giveaway.maxWinners);
     }
   }
 
@@ -528,16 +568,21 @@ export class GiveawayService {
     ownerId: ObjectId,
     giveaway?: GiveawayDocument | GiveawayDto,
   ) {
-    const undistributedGiveways = await this.findUndistributed(ownerId);
-    let totalGalaFee = undistributedGiveways.reduce((accumulator, giveaway) => {
-      let fee = new BigNumber(this.getRequiredGalaGasFeeForGiveaway(giveaway));
+    const unDistributedGiveaways = await this.findUndistributed(ownerId);
+    let totalGalaFee = unDistributedGiveaways.reduce(
+      (accumulator, giveaway) => {
+        let fee = new BigNumber(
+          this.getRequiredGalaGasFeeForGiveaway(giveaway),
+        );
 
-      if (checkTokenEquality(giveaway.giveawayToken, GALA_TOKEN)) {
-        //If the user is giving away gala, this should be accounted for
-        fee = fee.plus(this.getRequiredTokensForGiveaway(giveaway));
-      }
-      return accumulator.plus(fee);
-    }, new BigNumber(0));
+        if (checkTokenEquality(giveaway.giveawayToken, GALA_TOKEN)) {
+          //If the user is giving away gala, this should be accounted for
+          fee = fee.plus(this.getRequiredTokensForGiveaway(giveaway));
+        }
+        return accumulator.plus(fee);
+      },
+      new BigNumber(0),
+    );
 
     if (giveaway) {
       totalGalaFee = totalGalaFee.plus(
@@ -567,16 +612,16 @@ export class GiveawayService {
       );
     }
 
-    const undistributedGiveways = await this.findUndistributed(
+    const unDistributedGiveaways = await this.findUndistributed(
       ownerId,
       tokenClassKey,
     );
 
-    undistributedGiveways
+    unDistributedGiveaways
       .filter((giveaway) => giveaway.giveawayTokenType === giveawayTokenType)
       .forEach((giveaway) => {
         switch (giveaway.giveawayType) {
-          case 'DistributedGiveway':
+          case 'DistributedGiveaway':
             totalQuantity = BigNumber(totalQuantity).minus(
               giveaway.tokenQuantity,
             );
@@ -599,14 +644,14 @@ export class GiveawayService {
       tokenClassKey,
     );
 
-    const undistributedGiveways = await this.findUndistributed(
+    const unDistributedGiveaways = await this.findUndistributed(
       ownerId,
       tokenClassKey,
     );
 
-    undistributedGiveways.forEach((giveaway) => {
+    unDistributedGiveaways.forEach((giveaway) => {
       switch (giveaway.giveawayType) {
-        case 'DistributedGiveway':
+        case 'DistributedGiveaway':
           totalQuantity = BigNumber(totalQuantity).minus(
             giveaway.tokenQuantity,
           );

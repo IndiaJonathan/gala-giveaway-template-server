@@ -81,7 +81,7 @@ describe('Giveaway Controller (e2e)', () => {
     endDateTime,
     telegramAuthRequired: false,
     requireBurnTokenToClaim: false,
-    giveawayType: 'DistributedGiveway',
+    giveawayType: 'DistributedGiveaway',
     giveawayToken: {
       additionalKey: 'none',
       category: 'Unit',
