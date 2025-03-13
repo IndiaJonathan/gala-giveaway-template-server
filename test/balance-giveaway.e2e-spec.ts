@@ -519,7 +519,7 @@ describe('Giveaway Controller (e2e)', () => {
     expect(balances.Data[0].quantity).toBe(1);
   });
 
-  it.only('should create a Win entry in the database when claiming an FCFS giveaway', async () => {
+  it('should create a Win entry in the database when claiming an FCFS giveaway', async () => {
     const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
       await createUser();
 
@@ -566,6 +566,10 @@ describe('Giveaway Controller (e2e)', () => {
       claimFCFSData,
     );
 
+    const winModel2 = app.get(getModelToken('Win'));
+    const test2 = await winModel2.find({}).exec();
+    console.log(test2);
+
     await request(app.getHttpServer())
       .post('/api/giveaway/fcfs/claim')
       .set('Content-Type', 'application/json')
@@ -577,6 +581,8 @@ describe('Giveaway Controller (e2e)', () => {
 
     // Verify a win entry was created in the database
     const winModel = app.get(getModelToken('Win'));
+    const test = await winModel.find({}).exec();
+    console.log(test);
     const winEntries = await winModel
       .find({
         gcAddress: userProfile.galaChainAddress,

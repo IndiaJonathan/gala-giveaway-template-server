@@ -7,8 +7,9 @@ import {
   IsOptional,
 } from 'class-validator';
 import { BurnTokenQuantityDto } from './BurnTokenQuantity.dto';
+import { SignedPayloadBaseDto } from './SignedPayloadBase.dto';
 
-export class ClaimFCFSRequestDTO {
+export class ClaimFCFSRequestDTO extends SignedPayloadBaseDto {
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

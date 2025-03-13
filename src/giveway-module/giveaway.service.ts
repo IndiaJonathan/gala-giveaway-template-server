@@ -43,7 +43,7 @@ export class GiveawayService {
     @InjectModel('Giveaway')
     private readonly giveawayModel: Model<GiveawayDocument>,
     @InjectModel('Win')
-    private readonly claimableWinModel: Model<WinDocument>,
+    private readonly winModel: Model<WinDocument>,
     @InjectModel('PaymentStatus') // Inject the Mongoose model for Profile
     private readonly paymentStatusModel: Model<PaymentStatusDocument>,
     private profileService: ProfileService,
@@ -139,7 +139,7 @@ export class GiveawayService {
    * @returns Array of giveaways where the user is a winner
    */
   async getUserWonGiveaways(gcAddress: string): Promise<any[]> {
-    const claimableWins = await this.claimableWinModel
+    const claimableWins = await this.winModel
       .find({ gcAddress })
       .populate('giveaway')
       .lean()
@@ -207,7 +207,7 @@ export class GiveawayService {
   }
 
   async getClaimableWin(claimableWinId: string) {
-    const claimableWin = await this.claimableWinModel
+    const claimableWin = await this.winModel
       .findById(claimableWinId)
       .populate('giveaway')
       .exec();
@@ -215,7 +215,7 @@ export class GiveawayService {
   }
 
   async getClaimableWins(gcAddress: string) {
-    return this.claimableWinModel.aggregate([
+    return this.winModel.aggregate([
       {
         $match: { gcAddress, claimed: { $ne: true } },
       },
@@ -245,7 +245,7 @@ export class GiveawayService {
   async createWinClaimsFromWinners(giveawayId: ObjectId, winners: Winner[]) {
     const claimableWins = winners.map(
       (winner) =>
-        new this.claimableWinModel({
+        new this.winModel({
           giveaway: giveawayId,
           amountWon: winner.winAmount,
           gcAddress: winner.gcAddress,
@@ -485,6 +485,13 @@ export class GiveawayService {
       paymentStatus.burnInfo = JSON.stringify(paymentStatus);
       await paymentStatus.save();
     }
+
+    await new this.winModel({
+      giveaway: giveaway.id,
+      gcAddress,
+      amountWon: giveaway.claimPerUser,
+      completed: false,
+    }).save();
 
     const sendResult = await this.sendWinnings(
       gcAddress,

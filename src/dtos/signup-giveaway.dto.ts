@@ -1,8 +1,8 @@
 // src/dto/giveaway.dto.ts
 import { IsNotEmpty, IsString, IsMongoId, Matches } from 'class-validator';
-import { SignedBaseDto } from './SignedBase.dto';
+import { SignedPayloadBaseDto } from './SignedPayloadBase.dto';
 
-export class SignupGiveawayDto extends SignedBaseDto {
+export class SignupGiveawayDto extends SignedPayloadBaseDto {
   @IsNotEmpty()
   @IsString()
   @IsMongoId()

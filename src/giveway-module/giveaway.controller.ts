@@ -31,7 +31,6 @@ import { checkTokenEquality } from '../chain.helper';
 import { GALA_TOKEN } from '../constant';
 import { GasFeeEstimateRequestDto } from '../dtos/GasFeeEstimateRequest.dto';
 import { TokensAvailableDto } from '../dtos/TokensAvailable.dto';
-import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
 
 @Controller('api/giveaway')
 export class GiveawayController {
