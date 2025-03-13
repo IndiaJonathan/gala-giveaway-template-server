@@ -577,7 +577,7 @@ export class GiveawayService {
       case 'DistributedGiveaway':
         switch (giveaway.giveawayTokenType) {
           case GiveawayTokenType.BALANCE:
-            return BigNumber(1).multipliedBy(giveaway.maxWinners);
+            return BigNumber(1);
           case GiveawayTokenType.ALLOWANCE:
             return BigNumber(1);
         }

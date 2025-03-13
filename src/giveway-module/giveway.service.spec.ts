@@ -8,6 +8,8 @@ import { SecretConfigModule } from '../secrets/secrets.module';
 import { GalachainApi } from '../web3-module/galachain.api';
 import { MockGalachainApi } from '../../test/mocks/mock-galachain.api';
 import { WalletService } from '../web3-module/wallet.service';
+import { GiveawayTokenType } from '../dtos/giveaway.dto';
+import { GasFeeEstimateRequestDto } from '../dtos/GasFeeEstimateRequest.dto';
 
 describe('GiveawayService', () => {
   let giveawayService: GiveawayService;
@@ -305,5 +307,41 @@ describe('GiveawayService', () => {
       );
     });
     jest.restoreAllMocks();
+  });
+
+  it('should return 1 gas fee for BALANCE token type regardless of maxWinners', () => {
+    const giveawayDto: GasFeeEstimateRequestDto = {
+      giveawayType: 'DistributedGiveaway',
+      giveawayTokenType: GiveawayTokenType.BALANCE,
+      maxWinners: 100,
+    };
+
+    const gasFee =
+      giveawayService.getRequiredGalaGasFeeForGiveaway(giveawayDto);
+    expect(gasFee.toString()).toBe('1');
+  });
+
+  it('should return 1 gas fee for ALLOWANCE token type', () => {
+    const giveawayDto: GasFeeEstimateRequestDto = {
+      giveawayType: 'DistributedGiveaway',
+      giveawayTokenType: GiveawayTokenType.ALLOWANCE,
+      maxWinners: 100,
+    };
+
+    const gasFee =
+      giveawayService.getRequiredGalaGasFeeForGiveaway(giveawayDto);
+    expect(gasFee.toString()).toBe('1');
+  });
+
+  it('should return maxWinners as gas fee for FirstComeFirstServe giveaway type', () => {
+    const giveawayDto: GasFeeEstimateRequestDto = {
+      giveawayType: 'FirstComeFirstServe',
+      giveawayTokenType: GiveawayTokenType.BALANCE,
+      maxWinners: 100,
+    };
+
+    const gasFee =
+      giveawayService.getRequiredGalaGasFeeForGiveaway(giveawayDto);
+    expect(gasFee.toString()).toBe('100');
   });
 });

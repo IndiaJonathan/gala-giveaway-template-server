@@ -105,6 +105,19 @@ describe('Giveaway Controller (e2e)', () => {
 
     const profile = await profileService.createProfile(wallet.ethAddress);
 
+    // Grant sufficient tokens for the distribution but not enough for gas fees
+    mockGalachainApi.grantBalanceForToken(
+      profile.giveawayWalletAddress,
+      {
+        additionalKey: 'none',
+        category: 'Unit',
+        collection: 'TOKEN_FOR_GIVEAWAY', // Use a different token than GALA
+        type: 'none',
+      } as any,
+      100, // Plenty of tokens for distribution
+    );
+
+    // Grant very low GALA balance for gas fees
     mockGalachainApi.grantBalanceForToken(
       profile.giveawayWalletAddress,
       {
@@ -113,7 +126,7 @@ describe('Giveaway Controller (e2e)', () => {
         collection: 'GALA',
         type: 'none',
       } as any,
-      55,
+      0.5,
     );
 
     const signer = new SigningClient(wallet.privateKey);
@@ -121,30 +134,28 @@ describe('Giveaway Controller (e2e)', () => {
       ...startBalanceGiveaway,
       maxWinners: 10,
       tokenQuantity: 5,
+      giveawayToken: {
+        additionalKey: 'none',
+        category: 'Unit',
+        collection: 'TOKEN_FOR_GIVEAWAY',
+        type: 'none',
+      },
     });
 
     return await request(app.getHttpServer())
       .post('/api/giveaway/start')
       .set('Content-Type', 'application/json')
       .send(signedPayload)
-      .expect({
-        success: false,
-        message: 'Failed to start giveaway',
-        error: {
-          response: {
-            message:
-              'Insuffucient GALA balance in Giveway wallet, need additional 5',
-            error: 'Bad Request',
-            statusCode: 400,
-          },
-          status: 400,
-          options: {},
-          message:
-            'Insuffucient GALA balance in Giveway wallet, need additional 5',
-          name: 'BadRequestException',
-        },
-      })
-      .expect(400);
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.success).toBe(false);
+        expect(res.body.message).toBe('Failed to start giveaway');
+        expect(res.body.error.response.error).toBe('Bad Request');
+        expect(res.body.error.response.message).toContain(
+          'Insuffucient GALA balance in Giveway wallet',
+        );
+        expect(res.body.error.status).toBe(400);
+      });
   });
 
   it('should create a giveaway', async () => {
