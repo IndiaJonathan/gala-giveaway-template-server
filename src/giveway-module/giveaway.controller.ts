@@ -22,7 +22,6 @@ import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
 import { BurnTokensRequestDto } from '../dtos/ClaimWin.dto';
 import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
-import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
 import { ObjectId } from 'mongodb';
 import {
   recoverWalletAddressFromSignature,
@@ -31,6 +30,8 @@ import {
 import { checkTokenEquality } from '../chain.helper';
 import { GALA_TOKEN } from '../constant';
 import { GasFeeEstimateRequestDto } from '../dtos/GasFeeEstimateRequest.dto';
+import { TokensAvailableDto } from '../dtos/TokensAvailable.dto';
+import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
 
 @Controller('api/giveaway')
 export class GiveawayController {
@@ -269,20 +270,20 @@ export class GiveawayController {
   @Post('tokens-available/:gcAddress')
   async getTokensAvailable(
     @Param('gcAddress') gcAddress: string,
-    @Body() tokenClass: TokenInstanceKeyDto,
+    @Body() tokenDto: TokensAvailableDto,
   ) {
     const userInfo = await this.profileService.findProfileByGC(gcAddress);
 
     const allowances = await this.giveawayService.getNetAvailableTokenQuantity(
       userInfo.giveawayWalletAddress,
       userInfo._id as ObjectId,
-      tokenClass,
-      GiveawayTokenType.ALLOWANCE,
+      tokenDto.tokenInstanceKey,
+      tokenDto.tokenType,
     );
 
     const tokenBalances = await this.tokenService.getBalancesForToken(
       userInfo.giveawayWalletAddress,
-      tokenClass,
+      tokenDto.tokenInstanceKey,
     );
     const tokenBalance = tokenBalances.Data.reduce((total, item) => {
       return total.plus(item.quantity);
@@ -290,7 +291,7 @@ export class GiveawayController {
 
     const galaBalances = await this.tokenService.getBalancesForToken(
       userInfo.giveawayWalletAddress,
-      tokenClass,
+      tokenDto.tokenInstanceKey,
     );
 
     //todo: account for locks
@@ -298,7 +299,7 @@ export class GiveawayController {
       return total.plus(item.quantity);
     }, new BigNumber(0));
 
-    const currentGalaFeesNeeded =
+    const galaNeededForOtherGiveaways =
       await this.giveawayService.getTotalGalaFeesRequiredPlusEscrow(
         userInfo.id,
       );
@@ -308,7 +309,7 @@ export class GiveawayController {
       tokenBalance,
       galaBalance,
       giveawayWallet: userInfo.giveawayWalletAddress,
-      currentGalaFeesNeeded,
+      galaNeededForOtherGiveaways,
     };
   }
 

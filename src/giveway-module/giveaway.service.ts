@@ -23,7 +23,6 @@ import {
   GalaChainBaseApi,
   PresignedClient,
   SigningClient,
-  TokenApi,
 } from '@gala-chain/connect';
 import { ObjectId } from 'mongodb';
 import {
@@ -265,25 +264,41 @@ export class GiveawayService {
     amount: BigNumber,
     giveaway: GiveawayDocument,
   ) {
-    const tokenApiEndpoint = this.secrets['TOKEN_API_ENDPOINT'];
     const encryptionKey = this.secrets['ENCRYPTION_KEY'];
 
     const creatorProfile = await this.profileService.findProfile(
       giveaway.creator,
     );
     const decryptedKey = await creatorProfile.decryptPrivateKey(encryptionKey);
-    const giveawayWalletSigner = new SigningClient(decryptedKey);
-    const tokenApi = new TokenApi(tokenApiEndpoint, giveawayWalletSigner);
-    try {
-      const mintToken = await tokenApi.MintToken({
-        quantity: amount,
-        tokenClass: giveaway.giveawayToken,
-        owner: winnerGCAddress,
-      });
-      return mintToken;
-    } catch (e) {
-      console.error(e);
-      throw e;
+
+    if (giveaway.giveawayTokenType === GiveawayTokenType.BALANCE) {
+      const transferToken = await this.galachainApi.transferToken(
+        {
+          quantity: amount,
+          tokenInstance: {
+            ...giveaway.giveawayToken,
+            instance: BigNumber(0),
+          },
+          to: winnerGCAddress,
+        },
+        new SigningClient(decryptedKey),
+      );
+      return transferToken;
+    } else {
+      try {
+        const mintToken = await this.galachainApi.mintToken(
+          {
+            quantity: amount,
+            tokenClass: giveaway.giveawayToken,
+            owner: winnerGCAddress,
+          },
+          new SigningClient(decryptedKey),
+        );
+        return mintToken;
+      } catch (e) {
+        console.error(e);
+        throw e;
+      }
     }
   }
 

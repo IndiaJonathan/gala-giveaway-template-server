@@ -32,7 +32,7 @@ describe('GiveawayService', () => {
           useValue: mockModel,
         },
         {
-          provide: getModelToken('ClaimableWin'),
+          provide: getModelToken('Win'),
           useValue: mockModel,
         },
         {

@@ -6,6 +6,7 @@ import {
   BurnTokensRequest,
   BatchMintTokenRequest,
   TransferTokenRequest,
+  MintTokenRequest,
 } from '@gala-chain/connect';
 
 import {
@@ -137,6 +138,14 @@ export class GalachainApi implements OnModuleInit {
       console.error(e);
       throw e;
     }
+  }
+
+  async mintToken(dto: MintTokenRequest, signer?: SigningClient) {
+    const tokenApi = new TokenApi(
+      this.tokenApiEndpoint,
+      signer || this.adminSigner,
+    );
+    return tokenApi.MintToken(dto);
   }
 
   async createRandomWallet(registrationEndpoint: string) {

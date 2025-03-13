@@ -5,6 +5,7 @@ import {
   BurnTokensRequest,
   BatchMintTokenRequest,
   TransferTokenRequest,
+  MintTokenRequest,
 } from '@gala-chain/connect';
 
 import {
@@ -86,7 +87,7 @@ export class MockGalachainApi implements OnModuleInit {
 
   async transferToken(dto: TransferTokenRequest, signer?: SigningClient) {
     const transferFrom =
-      signer.galaChainAddress || this.adminSigner.galaChainAddress;
+      signer?.galaChainAddress || this.adminSigner.galaChainAddress;
 
     this.deductBalance(dto.tokenInstance, dto.quantity as any, transferFrom);
     this.grantBalanceForToken(dto.to, dto.tokenInstance, Number(dto.quantity));
@@ -96,7 +97,23 @@ export class MockGalachainApi implements OnModuleInit {
     );
     return {
       success: true,
+      Status: 1,
       Data: newBalances.Data,
+    };
+  }
+
+  async mintToken(dto: MintTokenRequest, signer?: SigningClient) {
+    // Get the signer address
+    const signerAddress = signer?.galaChainAddress || this.adminSigner.galaChainAddress;
+
+    // Deduct allowance for the token
+    this.deductAllowance(dto.tokenClass, Number(dto.quantity), signerAddress);
+
+    // Add tokens to the balance
+    this.grantBalanceForToken(dto.owner, dto.tokenClass, Number(dto.quantity));
+    return {
+      success: true,
+      message: `Successfully minted tokens.`,
     };
   }
 

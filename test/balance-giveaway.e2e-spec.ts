@@ -519,6 +519,76 @@ describe('Giveaway Controller (e2e)', () => {
     expect(balances.Data[0].quantity).toBe(1);
   });
 
+  it.only('should create a Win entry in the database when claiming an FCFS giveaway', async () => {
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
+      await createUser();
+
+    // Grant tokens to the creator's giveaway wallet
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    // Prepare a FCFS giveaway
+    const fcfsGiveaway = {
+      ...startBalanceGiveaway,
+      giveawayType: 'FirstComeFirstServe',
+      claimPerUser: 2,
+      maxWinners: 5,
+    };
+
+    const signedPayload = await giveawayCreatorSigner.sign(
+      'Start Giveaway',
+      fcfsGiveaway,
+    );
+
+    // Create FCFS giveaway
+    const createRes = await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(201);
+
+    expect(createRes.body.success).toBe(true);
+    const giveawayId = createRes.body.giveaway._id;
+
+    // Create a user to claim the giveaway
+    const { profile: userProfile, signer: userSigner } = await createUser();
+
+    // User claims the FCFS giveaway
+    const claimFCFSData = {
+      giveawayId,
+    };
+
+    const signedPayload2 = await userSigner.sign(
+      'Claim FCFS Giveaway',
+      claimFCFSData,
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/fcfs/claim')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload2)
+      .expect((res) => {
+        expect(res.body).toMatchObject({ success: true });
+      })
+      .expect(201);
+
+    // Verify a win entry was created in the database
+    const winModel = app.get(getModelToken('Win'));
+    const winEntries = await winModel
+      .find({
+        gcAddress: userProfile.galaChainAddress,
+        giveaway: giveawayId,
+      })
+      .exec();
+
+    expect(winEntries.length).toBe(1);
+    expect(winEntries[0].amountWon).toBe(fcfsGiveaway.claimPerUser);
+    expect(winEntries[0].claimed).toBe(false);
+  });
+
   afterEach(async () => {
     try {
       await memoryServer.stop();
