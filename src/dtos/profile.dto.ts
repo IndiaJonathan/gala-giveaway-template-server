@@ -1,11 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class ProfileDto {
   ethAddress: string;
   galaChainAddress: string;
   telegramId?: string;
-  first_name?: string;
-  last_name?: string;
+  firstName?: string;
+  lastName?: string;
   id?: string;
 }
 
@@ -18,15 +18,15 @@ export class LinkDto {
   @IsNotEmpty()
   'GalaChain Address': string;
 
-  @IsNumber()
+  @IsString()
   @IsOptional()
   id: string;
 
   @IsString()
   @IsNotEmpty()
-  first_name: string;
+  firstName: string;
 
   @IsString()
   @IsOptional()
-  last_name: string;
+  lastName: string;
 }

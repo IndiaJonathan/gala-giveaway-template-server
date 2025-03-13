@@ -87,8 +87,8 @@ export class ProfileController {
         linkDto['GalaChain Address'],
       );
       profile.telegramId = linkDto.id;
-      profile.firstName = linkDto.first_name;
-      profile.lastName = linkDto.last_name;
+      profile.firstName = linkDto.firstName;
+      profile.lastName = linkDto.lastName;
       try {
         await profile.save();
       } catch (error) {
