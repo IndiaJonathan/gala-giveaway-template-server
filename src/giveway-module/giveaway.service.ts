@@ -645,11 +645,17 @@ export class GiveawayService {
         switch (giveaway.giveawayType) {
           case 'DistributedGiveaway':
             totalQuantity = BigNumber(totalQuantity).minus(
-              giveaway.tokenQuantity,
+              new BigNumber(giveaway.tokenQuantity).multipliedBy(
+                giveaway.maxWinners,
+              ),
             );
             break;
           case 'FirstComeFirstServe':
-            totalQuantity = BigNumber(totalQuantity).minus(giveaway.maxWinners);
+            totalQuantity = BigNumber(totalQuantity).minus(
+              new BigNumber(giveaway.maxWinners).multipliedBy(
+                giveaway.claimPerUser,
+              ),
+            );
         }
       });
 

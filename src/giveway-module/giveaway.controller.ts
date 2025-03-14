@@ -75,10 +75,7 @@ export class GiveawayController {
 
       //Includes escrow
       const tokensNeeded =
-        await this.giveawayService.getTotalRequiredTokensAndEscrow(
-          account.id,
-          giveawayDto,
-        );
+        this.giveawayService.getRequiredTokensForGiveaway(giveawayDto);
       const tokenDiff = BigNumber(availableTokens).minus(
         BigNumber(tokensNeeded),
       );
