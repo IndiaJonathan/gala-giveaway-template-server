@@ -35,6 +35,13 @@ export class GivewayScheduler {
       const creatorProfile = await this.profileService.findProfile(
         giveaway.creator,
       );
+      if (!creatorProfile) {
+        console.error(
+          `Creator profile not found for giveaway: ${giveaway._id}`,
+        );
+        await handleGiveawayError(giveaway, 'Creator profile not found');
+        continue;
+      }
       const decryptedKey =
         await creatorProfile.decryptPrivateKey(encryptionKey);
       await this.profileService.checkAndRegisterProfile(decryptedKey);
@@ -132,7 +139,7 @@ export class GivewayScheduler {
               if (index === -1) {
                 await throwAndLogGiveawayError(
                   giveaway,
-                  `Unable to find gcAddress for winner. Winner: ${owner}`,
+                  `Unable to find gcAddre[ss for winner. Winner: ${owner}`,
                 );
               }
 
@@ -159,13 +166,7 @@ export class GivewayScheduler {
         }
       } catch (e) {
         if (e instanceof GalaChainResponseError) {
-          giveaway.giveawayErrors.push(JSON.stringify(e));
-          if (giveaway.giveawayErrors.length > 5) {
-            //5 or more errors, just call it
-            giveaway.giveawayStatus = GiveawayStatus.Errored;
-            console.error(`Giveaway: ${giveaway._id} has errored out!!!`);
-          }
-          await giveaway.save();
+          await handleGiveawayError(giveaway, e);
           const user = getUserFromMessage(e.Message);
           if (!user) {
             console.error(e);
@@ -183,6 +184,7 @@ export class GivewayScheduler {
           }
         } else {
           console.error(e);
+          await handleGiveawayError(giveaway, e);
         }
       } finally {
         await giveaway.save();
@@ -198,6 +200,45 @@ async function throwAndLogGiveawayError(
   giveaway.giveawayErrors.push(error);
   await giveaway.save();
   throw error;
+}
+
+/**
+ * Handles errors for giveaways by adding the error to the giveaway's error list,
+ * checking if the errors are above the threshold (5), and setting the status to Errored if so.
+ * @param giveaway The giveaway document to add the error to
+ * @param error The error message or object to add
+ * @param saveImmediately Whether to save the giveaway document immediately (default: true)
+ * @returns The updated giveaway document
+ */
+async function handleGiveawayError(
+  giveaway: GiveawayDocument,
+  error: string | Error | GalaChainResponseError<any>,
+  saveImmediately = true,
+): Promise<GiveawayDocument> {
+  let errorMessage: string;
+
+  if (error instanceof Error) {
+    errorMessage = error.message || JSON.stringify(error);
+  } else if (typeof error === 'string') {
+    errorMessage = error;
+  } else {
+    errorMessage = JSON.stringify(error);
+  }
+
+  giveaway.giveawayErrors.push(errorMessage);
+
+  if (giveaway.giveawayErrors.length > 5) {
+    giveaway.giveawayStatus = GiveawayStatus.Errored;
+    console.error(
+      `Giveaway: ${giveaway._id} has errored out after ${giveaway.giveawayErrors.length} errors!!!`,
+    );
+  }
+
+  if (saveImmediately) {
+    await giveaway.save();
+  }
+
+  return giveaway;
 }
 
 function getUserFromMessage(message: string) {

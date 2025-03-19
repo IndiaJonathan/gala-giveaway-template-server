@@ -31,6 +31,10 @@ import { checkTokenEquality } from '../chain.helper';
 import { GALA_TOKEN } from '../constant';
 import { GasFeeEstimateRequestDto } from '../dtos/GasFeeEstimateRequest.dto';
 import { TokensAvailableDto } from '../dtos/TokensAvailable.dto';
+import { 
+  filterGiveawaysData,
+  filterGiveawayData,
+} from '../utils/giveaway-utils';
 
 @Controller('api/giveaway')
 export class GiveawayController {
@@ -73,7 +77,6 @@ export class GiveawayController {
           giveawayDto.giveawayTokenType,
         );
 
-      //Includes escrow
       const tokensNeeded =
         this.giveawayService.getRequiredTokensForGiveaway(giveawayDto);
       const tokenDiff = BigNumber(availableTokens).minus(
@@ -188,7 +191,8 @@ export class GiveawayController {
   ) {
     try {
       const giveaways = await this.giveawayService.getGiveaways(gcAddress);
-      res.status(HttpStatus.OK).json(giveaways);
+      // Already filtered in the service, but let's double-check to ensure consistency
+      res.status(HttpStatus.OK).json(filterGiveawaysData(giveaways));
     } catch (error) {
       console.error(error);
       res.status(HttpStatus.BAD_REQUEST).json({
@@ -318,7 +322,19 @@ export class GiveawayController {
       const claimableWins =
         await this.giveawayService.getClaimableWins(gcAddress);
 
-      res.status(HttpStatus.OK).json(claimableWins);
+      // Ensure no giveawayErrors are included in the response
+      res.status(HttpStatus.OK).json(
+        claimableWins.map((win) => {
+          // Filter giveaway data if present
+          if (win.giveawayDetails) {
+            return {
+              ...win,
+              giveawayDetails: filterGiveawayData(win.giveawayDetails),
+            };
+          }
+          return win;
+        }),
+      );
     } catch (error) {
       console.error(error);
       res.status(HttpStatus.BAD_REQUEST).json({
@@ -339,7 +355,8 @@ export class GiveawayController {
       const userWonGiveaways =
         await this.giveawayService.getUserWonGiveaways(gcAddress);
 
-      res.status(HttpStatus.OK).json(userWonGiveaways);
+      // Already filtered in the service, but let's double-check to ensure consistency
+      res.status(HttpStatus.OK).json(filterGiveawaysData(userWonGiveaways));
     } catch (error) {
       console.error(error);
       res.status(HttpStatus.BAD_REQUEST).json({

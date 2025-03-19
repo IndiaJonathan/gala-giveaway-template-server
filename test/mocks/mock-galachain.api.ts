@@ -89,7 +89,11 @@ export class MockGalachainApi implements OnModuleInit {
     const transferFrom =
       signer?.galaChainAddress || this.adminSigner.galaChainAddress;
 
-    this.deductBalance(dto.tokenInstance, dto.quantity as any, transferFrom);
+    this.deductBalance(
+      dto.tokenInstance,
+      new BigNumber(dto.quantity as any).plus(1).toNumber(),
+      transferFrom,
+    );
     this.grantBalanceForToken(dto.to, dto.tokenInstance, Number(dto.quantity));
     const newBalances = await this.getBalancesForToken(
       dto.to,
@@ -319,7 +323,6 @@ export class MockGalachainApi implements OnModuleInit {
         .filter((balance: TokenBalance) =>
           checkTokenEquality(balance, tokenClassKey),
         )
-        // ?.filter((allowance) => allowance.tokenClass === tokenClassKey)
         .reduce(
           (sum: number, balance: TokenBalance) =>
             sum + Number(balance.quantity),
@@ -330,20 +333,31 @@ export class MockGalachainApi implements OnModuleInit {
       throw new Error('Insufficient token balance');
     }
 
+    let remainingAmountToDeduct = amount;
+
     this.tokenBalances[user].forEach((balance: TokenBalance) => {
-      if (checkTokenEquality(balance, tokenClassKey) && amount > 0) {
+      if (
+        checkTokenEquality(balance, tokenClassKey) &&
+        remainingAmountToDeduct > 0
+      ) {
         const availableQuantity = Number(balance.quantity);
 
-        if (availableQuantity >= amount) {
-          amount = 0;
+        if (availableQuantity >= remainingAmountToDeduct) {
+          // Deduct the full remaining amount from this balance
+          balance.quantity = new BigNumber(
+            availableQuantity - remainingAmountToDeduct,
+          );
+          remainingAmountToDeduct = 0;
         } else {
-          amount -= availableQuantity;
+          // Deduct the available quantity and continue with remaining amount
+          balance.quantity = new BigNumber(0);
+          remainingAmountToDeduct -= availableQuantity;
         }
       }
     });
 
     // If amount is still greater than 0, we haven't been able to deduct the full amount, so throw error
-    if (amount > 0) {
+    if (remainingAmountToDeduct > 0) {
       throw new Error('Insufficient allowance balance');
     }
   }

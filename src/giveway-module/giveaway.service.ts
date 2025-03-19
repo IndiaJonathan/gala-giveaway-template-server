@@ -36,6 +36,7 @@ import { GalachainApi } from '../web3-module/galachain.api';
 import { PaymentStatusDocument } from '../schemas/PaymentStatusSchema';
 import { WalletService } from '../web3-module/wallet.service';
 import { GasFeeEstimateRequestDto } from '../dtos/GasFeeEstimateRequest.dto';
+import { filterGiveawayData } from '../utils/giveaway-utils';
 
 @Injectable()
 export class GiveawayService {
@@ -113,9 +114,12 @@ export class GiveawayService {
       // Determine if the gcAddress is in the list of winners
       const isWinner = winnerAddresses.includes(gcAddress);
 
+      // Filter out sensitive fields like giveawayErrors
+      const filteredGiveaway = filterGiveawayData(giveaway);
+
       // Remove the 'winners' field
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { winners, ...rest } = giveaway;
+      const { winners, ...rest } = filteredGiveaway;
 
       if (giveaway.giveawayType === 'FirstComeFirstServe') {
         return {
@@ -153,21 +157,25 @@ export class GiveawayService {
         if (!giveaway) {
           return null;
         }
+
+        // Filter out sensitive fields like giveawayErrors first
+        const filteredGiveaway = filterGiveawayData(giveaway);
+
         // Extract only the requested fields from giveaway
-        const filteredGiveaway = {
-          endDateTime: giveaway.endDateTime,
-          giveawayType: giveaway.giveawayType,
-          giveawayToken: giveaway.giveawayToken,
-          tokenQuantity: giveaway.tokenQuantity,
-          creator: giveaway.creator,
-          burnToken: giveaway.burnToken,
-          burnTokenQuantity: giveaway.burnTokenQuantity,
+        const selectedGiveawayFields = {
+          endDateTime: filteredGiveaway.endDateTime,
+          giveawayType: filteredGiveaway.giveawayType,
+          giveawayToken: filteredGiveaway.giveawayToken,
+          tokenQuantity: filteredGiveaway.tokenQuantity,
+          creator: filteredGiveaway.creator,
+          burnToken: filteredGiveaway.burnToken,
+          burnTokenQuantity: filteredGiveaway.burnTokenQuantity,
         };
 
         // Return claimable win data with filtered giveaway data
         return {
           ...claimableWinData,
-          giveaway: filteredGiveaway,
+          giveaway: selectedGiveawayFields,
         };
       })
       .filter((win) => win !== null);
@@ -507,7 +515,14 @@ export class GiveawayService {
     paymentStatus.winningInfo = JSON.stringify(sendResult);
     await paymentStatus.save();
     if (sendResult.Status === 1) {
-      return sendResult;
+      // Create a user-friendly token name using the tokenToReadable function
+      const tokenName = tokenToReadable(giveaway.giveawayToken);
+      // Return a friendly message that includes the claimed amount and token
+      return {
+        message: `You successfully claimed ${giveaway.claimPerUser} of ${tokenName}`,
+        transactionDetails: sendResult,
+        success: true,
+      };
     } else {
       throw new InternalServerErrorException(sendResult);
     }
@@ -570,20 +585,27 @@ export class GiveawayService {
     return totalTokensRequired;
   }
 
-  getRequiredGalaGasFeeForGiveaway(giveaway: GasFeeEstimateRequestDto) {
-    switch (giveaway.giveawayType) {
-      //todo run dryrun
-
-      case 'DistributedGiveaway':
-        switch (giveaway.giveawayTokenType) {
-          case GiveawayTokenType.BALANCE:
-            return BigNumber(1);
-          case GiveawayTokenType.ALLOWANCE:
-            return BigNumber(1);
-        }
-      case 'FirstComeFirstServe':
-        return BigNumber(giveaway.maxWinners);
+  getRequiredGalaGasFeeForGiveaway(
+    giveawayDoc: GiveawayDto | GiveawayDocument | GasFeeEstimateRequestDto,
+  ) {
+    // For GasFeeEstimateRequestDto, use the default gas fee
+    if ('userId' in giveawayDoc) {
+      return 1;
     }
+
+    // Check if it's a fully claimed FCFS giveaway
+    if (
+      giveawayDoc.giveawayType === 'FirstComeFirstServe' &&
+      'winners' in giveawayDoc &&
+      giveawayDoc.winners &&
+      giveawayDoc.winners.length >= giveawayDoc.maxWinners
+    ) {
+      // All tokens claimed, no gas fee needed
+      return 0;
+    }
+
+    // Default gas fee for any giveaway
+    return 1;
   }
 
   async getTotalGalaFeesRequiredPlusEscrow(
@@ -599,7 +621,26 @@ export class GiveawayService {
 
         if (checkTokenEquality(giveaway.giveawayToken, GALA_TOKEN)) {
           //If the user is giving away gala, this should be accounted for
-          fee = fee.plus(this.getRequiredTokensForGiveaway(giveaway));
+          let tokensInEscrow;
+
+          if (giveaway.giveawayType === 'FirstComeFirstServe') {
+            // For FCFS, calculate remaining tokens in escrow based on remaining claims
+            const claimedWinners = giveaway.winners
+              ? giveaway.winners.length
+              : 0;
+            const remainingWinners = Math.max(
+              0,
+              giveaway.maxWinners - claimedWinners,
+            );
+            tokensInEscrow = new BigNumber(giveaway.claimPerUser).multipliedBy(
+              remainingWinners,
+            );
+          } else {
+            // For DistributedGiveaway, use the standard calculation
+            tokensInEscrow = this.getRequiredTokensForGiveaway(giveaway);
+          }
+
+          fee = fee.plus(tokensInEscrow);
         }
         return accumulator.plus(fee);
       },
@@ -651,8 +692,17 @@ export class GiveawayService {
             );
             break;
           case 'FirstComeFirstServe':
+            // Calculate remaining tokens to reserve based on remaining potential winners
+            const claimedWinners = giveaway.winners
+              ? giveaway.winners.length
+              : 0;
+            const remainingWinners = Math.max(
+              0,
+              giveaway.maxWinners - claimedWinners,
+            );
+
             totalQuantity = BigNumber(totalQuantity).minus(
-              new BigNumber(giveaway.maxWinners).multipliedBy(
+              new BigNumber(remainingWinners).multipliedBy(
                 giveaway.claimPerUser,
               ),
             );
@@ -690,5 +740,57 @@ export class GiveawayService {
     });
 
     return totalQuantity;
+  }
+
+  /**
+   * Find all giveaways created by the user with the provided GC address
+   * @param gcAddress The user's GC address
+   * @returns Array of giveaways created by the user
+   */
+  async getGiveawaysByCreator(gcAddress: string): Promise<any[]> {
+    try {
+      // First get the user's profile to get their ObjectId
+      const profile = await this.profileService.findProfileByGC(gcAddress);
+
+      // Then find all giveaways where creator equals the profile's ObjectId
+      const giveaways = await this.giveawayModel
+        .find({ creator: profile._id })
+        .lean()
+        .exec();
+
+      return giveaways.map((giveaway) => {
+        // Get the list of winner addresses
+        const winnerAddresses = giveaway.winners.map(
+          (winner: { gcAddress: string }) => winner.gcAddress,
+        );
+
+        // Determine if the creator is also a winner (rare case)
+        const isWinner = winnerAddresses.includes(gcAddress);
+
+        // Filter out sensitive fields like giveawayErrors
+        const filteredGiveaway = filterGiveawayData(giveaway);
+
+        // Transform the result to include winner count
+        if (filteredGiveaway.giveawayType === 'FirstComeFirstServe') {
+          return {
+            ...filteredGiveaway,
+            winnerCount: filteredGiveaway.winners.length,
+            isWinner,
+            claimsLeft:
+              filteredGiveaway.maxWinners - filteredGiveaway.winners.length,
+          };
+        }
+
+        // Return the modified giveaway object with winner count
+        return {
+          ...filteredGiveaway,
+          winnerCount: filteredGiveaway.winners.length,
+          isWinner,
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching giveaways by creator:', error);
+      throw error;
+    }
   }
 }

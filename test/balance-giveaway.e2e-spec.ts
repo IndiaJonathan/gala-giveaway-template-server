@@ -20,6 +20,8 @@ import {
 import { Model } from 'mongoose';
 import { getModelToken } from '@nestjs/mongoose';
 import { GiveawayTokenType } from '../src/dtos/giveaway.dto';
+import { GiveawayService } from '../src/giveway-module/giveaway.service';
+import { ObjectId } from 'mongodb';
 
 jest.setTimeout(50000);
 describe('Giveaway Controller (e2e)', () => {
@@ -31,6 +33,7 @@ describe('Giveaway Controller (e2e)', () => {
   let galachainApi: GalachainApi;
   let giveawayModel: Model<GiveawayDocument>;
   let secrets: Record<string, any>;
+  let giveawayService: GiveawayService;
 
   beforeEach(async () => {
     const dbPlaceHolder: Provider = {
@@ -65,6 +68,7 @@ describe('Giveaway Controller (e2e)', () => {
     giveawayModel = await app.resolve<Model<GiveawayDocument>>(
       getModelToken('Giveaway'),
     );
+    giveawayService = await app.resolve<GiveawayService>(GiveawayService);
   });
 
   it('should be defined', () => {
@@ -633,6 +637,7 @@ describe('Giveaway Controller (e2e)', () => {
       giveawayType: 'FirstComeFirstServe',
       claimPerUser: 2,
       maxWinners: 5,
+      uniqueKey: `giveaway-start-${new Date()}`,
     };
 
     const signedPayload = await giveawayCreatorSigner.sign(
@@ -656,6 +661,7 @@ describe('Giveaway Controller (e2e)', () => {
     // User claims the FCFS giveaway
     const claimFCFSData = {
       giveawayId,
+      uniqueKey: `giveaway-claim-${new Date()}`,
     };
 
     const signedPayload2 = await userSigner.sign(
@@ -672,7 +678,16 @@ describe('Giveaway Controller (e2e)', () => {
       .set('Content-Type', 'application/json')
       .send(signedPayload2)
       .expect((res) => {
-        expect(res.body).toMatchObject({ success: true });
+        expect(res.body).toMatchObject({
+          success: true,
+          message: expect.stringContaining(
+            `You successfully claimed ${fcfsGiveaway.claimPerUser} of GALA`,
+          ),
+          transactionDetails: {
+            Status: 1,
+            success: true,
+          },
+        });
       })
       .expect(201);
 
@@ -690,6 +705,616 @@ describe('Giveaway Controller (e2e)', () => {
     expect(winEntries.length).toBe(1);
     expect(winEntries[0].amountWon).toBe(fcfsGiveaway.claimPerUser);
     expect(winEntries[0].claimed).toBe(false);
+  });
+
+  it('should be able to create a new FCFS giveaway after claiming a previous one', async () => {
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
+      await createUser();
+
+    // 1. Grant enough balance to create 2 giveaways (plus gas fees)
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      GALA_TOKEN,
+      4,
+    );
+
+    // 2. Create a new FCFS giveaway
+    const fcfsGiveaway = {
+      ...startBalanceGiveaway,
+      giveawayType: 'FirstComeFirstServe',
+      claimPerUser: 1,
+      maxWinners: 1,
+    };
+
+    const signedPayload = await giveawayCreatorSigner.sign(
+      'Start Giveaway',
+      fcfsGiveaway,
+    );
+
+    // Create first FCFS giveaway
+    const createRes = await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(201);
+
+    expect(createRes.body.success).toBe(true);
+    const giveawayId = createRes.body.giveaway._id;
+
+    // 3. Have a user claim the FCFS giveaway
+    const { profile: userProfile, signer: userSigner } = await createUser();
+
+    // User claims the FCFS giveaway
+    const claimFCFSData = {
+      giveawayId,
+      uniqueKey: `giveaway-claim-${new Date()}`,
+    };
+
+    const signedClaimPayload = await userSigner.sign(
+      'Claim FCFS Giveaway',
+      claimFCFSData,
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/fcfs/claim')
+      .set('Content-Type', 'application/json')
+      .send(signedClaimPayload)
+      .expect((res) => {
+        expect(res.body).toMatchObject({
+          success: true,
+          message: expect.stringContaining(
+            `You successfully claimed ${fcfsGiveaway.claimPerUser} of GALA`,
+          ),
+          transactionDetails: {
+            Status: 1,
+            success: true,
+          },
+        });
+      })
+      .expect(201);
+
+    // Verify the claim was successful by checking win entry
+    const winModel = app.get(getModelToken('Win'));
+    const winEntries = await winModel
+      .find({
+        gcAddress: userProfile.galaChainAddress,
+        giveaway: giveawayId,
+      })
+      .exec();
+
+    expect(winEntries.length).toBe(1);
+    expect(winEntries[0].amountWon).toBe(fcfsGiveaway.claimPerUser);
+
+    // 4. Attempt to start a new FCFS giveaway
+    const secondFcfsGiveaway = {
+      ...startBalanceGiveaway,
+      giveawayType: 'FirstComeFirstServe',
+      claimPerUser: 1,
+      maxWinners: 1,
+    };
+
+    const signedSecondPayload = await giveawayCreatorSigner.sign(
+      'Start Giveaway',
+      secondFcfsGiveaway,
+    );
+
+    // Try to create second FCFS giveaway
+    await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedSecondPayload)
+      .expect((res) => {
+        expect(res.body).toMatchObject({ success: true });
+      })
+      .expect(201);
+
+    // Verify both giveaways exist
+    await request(app.getHttpServer())
+      .get('/api/giveaway/all')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.length).toBe(2);
+
+        // One giveaway should have participants
+        const giveawayWithParticipant = res.body.find(
+          (g) => g._id === giveawayId,
+        );
+        expect(giveawayWithParticipant).toBeDefined();
+
+        // The other should be newly created
+        const newGiveaway = res.body.find((g) => g._id !== giveawayId);
+        expect(newGiveaway).toBeDefined();
+        expect(newGiveaway.giveawayType).toBe('FirstComeFirstServe');
+      });
+  });
+
+  it('should fail to create a second FCFS giveaway after claiming when tokens are insufficient', async () => {
+    // Helper function to create and verify a FCFS giveaway
+    const createFCFSGiveaway = async (
+      creator,
+      claimPerUser = 1,
+      maxWinners = 1,
+    ) => {
+      const giveawayData = {
+        ...startBalanceGiveaway,
+        giveawayType: 'FirstComeFirstServe',
+        claimPerUser,
+        maxWinners,
+      };
+
+      const signedPayload = await creator.signer.sign(
+        'Start Giveaway',
+        giveawayData,
+      );
+
+      const createRes = await request(app.getHttpServer())
+        .post('/api/giveaway/start')
+        .set('Content-Type', 'application/json')
+        .send(signedPayload)
+        .expect(201);
+
+      expect(createRes.body.success).toBe(true);
+      return {
+        giveawayId: createRes.body.giveaway._id,
+        giveawayData,
+        signedPayload,
+      };
+    };
+
+    // Helper function to claim a FCFS giveaway
+    const claimFCFSGiveaway = async (user, giveawayId, claimPerUser) => {
+      const claimData = {
+        giveawayId,
+        uniqueKey: `giveaway-claim-${new Date()}`,
+      };
+
+      const signedClaimPayload = await user.signer.sign(
+        'Claim FCFS Giveaway',
+        claimData,
+      );
+
+      await request(app.getHttpServer())
+        .post('/api/giveaway/fcfs/claim')
+        .set('Content-Type', 'application/json')
+        .send(signedClaimPayload)
+        .expect((res) => {
+          expect(res.body).toMatchObject({
+            success: true,
+            message: expect.stringContaining(
+              `You successfully claimed ${claimPerUser} of GALA`,
+            ),
+            transactionDetails: {
+              Status: 1,
+              success: true,
+            },
+          });
+        })
+        .expect(201);
+
+      // Verify the claim was successful
+      const winModel = app.get(getModelToken('Win'));
+      const winEntries = await winModel
+        .find({
+          gcAddress: user.profile.galaChainAddress,
+          giveaway: giveawayId,
+        })
+        .exec();
+
+      expect(winEntries.length).toBe(1);
+      expect(winEntries[0].amountWon).toBe(claimPerUser);
+    };
+
+    // 1. Create the giveaway creator with only enough tokens for 1 giveaway
+    const giveawayCreator = await createUser();
+
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreator.profile.giveawayWalletAddress,
+      GALA_TOKEN,
+      2,
+    );
+
+    // 2. Create the first FCFS giveaway
+    const { giveawayId, giveawayData, signedPayload } =
+      await createFCFSGiveaway(giveawayCreator);
+
+    // 3. Create a user and have them claim the giveaway
+    const giveawayUser = await createUser();
+    await claimFCFSGiveaway(
+      giveawayUser,
+      giveawayId,
+      giveawayData.claimPerUser,
+    );
+
+    // 4. Try to create a second FCFS giveaway, which should fail due to insufficient tokens
+    const secondGiveaway = {
+      ...startBalanceGiveaway,
+      giveawayType: 'FirstComeFirstServe',
+      claimPerUser: 1,
+      maxWinners: 1,
+    };
+
+    const signedSecondPayload = await giveawayCreator.signer.sign(
+      'Start Giveaway',
+      secondGiveaway,
+    );
+
+    // This attempt should fail with a 400 error
+    await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedSecondPayload)
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.success).toBe(false);
+        expect(res.body.error.response.message).toContain(
+          'You need to transfer more tokens before you can start this giveaway. Need an additional 1',
+        );
+      });
+
+    // 5. Verify only the first giveaway exists
+    await request(app.getHttpServer())
+      .get('/api/giveaway/all')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.length).toBe(1);
+        expect(res.body[0]._id).toBe(giveawayId);
+      });
+  });
+
+  it('should release escrow for fully claimed FCFS giveaways', async () => {
+    // Helper functions for creating FCFS giveaways and claiming them
+    const createFCFSGiveaway = async (
+      creator,
+      claimPerUser = 1,
+      maxWinners = 2,
+    ) => {
+      const giveawayData = {
+        ...startBalanceGiveaway,
+        giveawayType: 'FirstComeFirstServe',
+        claimPerUser,
+        maxWinners,
+      };
+
+      const signedPayload = await creator.signer.sign(
+        'Start Giveaway',
+        giveawayData,
+      );
+
+      const createRes = await request(app.getHttpServer())
+        .post('/api/giveaway/start')
+        .set('Content-Type', 'application/json')
+        .send(signedPayload)
+        .expect(201);
+
+      expect(createRes.body.success).toBe(true);
+      return {
+        giveawayId: createRes.body.giveaway._id,
+        giveawayData,
+        signedPayload,
+      };
+    };
+
+    const claimFCFSGiveaway = async (
+      user,
+      giveawayId,
+      claimPerUser,
+      uniqueSuffix,
+    ) => {
+      const claimData = {
+        giveawayId,
+        uniqueKey: `giveaway-claim-${uniqueSuffix || new Date().getTime()}`,
+      };
+
+      const signedClaimPayload = await user.signer.sign(
+        'Claim FCFS Giveaway',
+        claimData,
+      );
+
+      await request(app.getHttpServer())
+        .post('/api/giveaway/fcfs/claim')
+        .set('Content-Type', 'application/json')
+        .send(signedClaimPayload)
+        .expect(201);
+
+      // Verify the claim was successful
+      const winModel = app.get(getModelToken('Win'));
+      const winEntries = await winModel
+        .find({
+          gcAddress: user.profile.galaChainAddress,
+          giveaway: giveawayId,
+        })
+        .exec();
+
+      expect(winEntries.length).toBe(1);
+      expect(winEntries[0].amountWon).toBe(claimPerUser);
+    };
+
+    // 1. Create a creator with enough tokens for multiple giveaways
+    const giveawayCreator = await createUser();
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreator.profile.giveawayWalletAddress,
+      GALA_TOKEN,
+      10, // Plenty of tokens
+    );
+
+    // 2. Get initial fee estimate before any giveaways
+    const initialFeeEstimate =
+      await giveawayService.getTotalGalaFeesRequiredPlusEscrow(
+        giveawayCreator.profile._id as ObjectId,
+      );
+
+    // 3. Create an FCFS giveaway with 2 max winners, 1 token per claim
+    const { giveawayId, giveawayData } = await createFCFSGiveaway(
+      giveawayCreator,
+      1, // claimPerUser
+      2, // maxWinners
+    );
+
+    // 4. Get fee estimate after creating giveaway but before claims
+    // This should include the escrow for the giveaway (1 token * 2 winners = 2 tokens)
+    const estimateAfterCreate =
+      await giveawayService.getTotalGalaFeesRequiredPlusEscrow(
+        giveawayCreator.profile._id as ObjectId,
+      );
+
+    // The new estimate should include the escrow for the unclaimed giveaway
+    expect(estimateAfterCreate.toNumber()).toBeGreaterThan(
+      initialFeeEstimate.toNumber(),
+    );
+
+    // 5. Create 2 users to fully claim the giveaway
+    const user1 = await createUser();
+    const user2 = await createUser();
+
+    // 6. Have both users claim from the giveaway
+    await claimFCFSGiveaway(
+      user1,
+      giveawayId,
+      giveawayData.claimPerUser,
+      'user1',
+    );
+
+    await claimFCFSGiveaway(
+      user2,
+      giveawayId,
+      giveawayData.claimPerUser,
+      'user2',
+    );
+
+    // 7. Get fee estimate after all claims are made
+    // The escrow should be released as all tokens have been claimed
+    const estimateAfterAllClaims =
+      await giveawayService.getTotalGalaFeesRequiredPlusEscrow(
+        giveawayCreator.profile._id as ObjectId,
+      );
+
+    // 8. The estimate after all claims should match the initial estimate
+    // since all tokens are now claimed and not in escrow anymore
+    console.log('Initial estimate:', initialFeeEstimate.toNumber());
+    console.log(
+      'Estimate after all claims:',
+      estimateAfterAllClaims.toNumber(),
+    );
+    expect(estimateAfterAllClaims.toNumber()).toBe(
+      initialFeeEstimate.toNumber(),
+    );
+
+    // 9. Make sure the giveaway exists but shows all tokens are claimed
+    const response = await request(app.getHttpServer())
+      .get('/api/giveaway/all')
+      .set('Content-Type', 'application/json')
+      .expect(200);
+
+    const giveaway = response.body.find((g) => g._id === giveawayId);
+    console.log('Giveaway data from API:', JSON.stringify(giveaway, null, 2));
+    expect(giveaway).toBeDefined();
+
+    // Check that no more claims are left, indicating all tokens have been claimed
+    expect(giveaway.claimsLeft).toBe(0);
+
+    // 10. Verify creating a new giveaway with the same parameters now works
+    // (since escrow is released)
+    const newGiveawayResult = await createFCFSGiveaway(giveawayCreator, 1, 2);
+
+    expect(newGiveawayResult.giveawayId).toBeDefined();
+  });
+
+  it('should partially release escrow for partially claimed FCFS giveaways', async () => {
+    // Helper functions for creating FCFS giveaways and claiming them
+    const createFCFSGiveaway = async (
+      creator,
+      claimPerUser = 1,
+      maxWinners = 3,
+    ) => {
+      const giveawayData = {
+        ...startBalanceGiveaway,
+        giveawayType: 'FirstComeFirstServe',
+        claimPerUser,
+        maxWinners,
+      };
+
+      const signedPayload = await creator.signer.sign(
+        'Start Giveaway',
+        giveawayData,
+      );
+
+      const createRes = await request(app.getHttpServer())
+        .post('/api/giveaway/start')
+        .set('Content-Type', 'application/json')
+        .send(signedPayload)
+        .expect(201);
+
+      expect(createRes.body.success).toBe(true);
+      return {
+        giveawayId: createRes.body.giveaway._id,
+        giveawayData,
+        signedPayload,
+      };
+    };
+
+    const claimFCFSGiveaway = async (
+      user,
+      giveawayId,
+      claimPerUser,
+      uniqueSuffix,
+    ) => {
+      const claimData = {
+        giveawayId,
+        uniqueKey: `giveaway-claim-${uniqueSuffix || new Date().getTime()}`,
+      };
+
+      const signedClaimPayload = await user.signer.sign(
+        'Claim FCFS Giveaway',
+        claimData,
+      );
+
+      await request(app.getHttpServer())
+        .post('/api/giveaway/fcfs/claim')
+        .set('Content-Type', 'application/json')
+        .send(signedClaimPayload)
+        .expect(201);
+
+      // Verify the claim was successful
+      const winModel = app.get(getModelToken('Win'));
+      const winEntries = await winModel
+        .find({
+          gcAddress: user.profile.galaChainAddress,
+          giveaway: giveawayId,
+        })
+        .exec();
+
+      expect(winEntries.length).toBe(1);
+      expect(winEntries[0].amountWon).toBe(claimPerUser);
+    };
+
+    // 1. Create a creator with enough tokens for the giveaway
+    const giveawayCreator = await createUser();
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreator.profile.giveawayWalletAddress,
+      GALA_TOKEN,
+      10, // Plenty of tokens
+    );
+
+    // 2. Get initial fee estimate before any giveaways
+    const initialFeeEstimate =
+      await giveawayService.getTotalGalaFeesRequiredPlusEscrow(
+        giveawayCreator.profile._id as ObjectId,
+      );
+
+    // 3. Create an FCFS giveaway with 3 max winners, 2 tokens per claim (total: 6 tokens)
+    const { giveawayId, giveawayData } = await createFCFSGiveaway(
+      giveawayCreator,
+      2, // claimPerUser
+      3, // maxWinners
+    );
+
+    // 4. Get fee estimate after creating giveaway but before claims
+    // This should include the escrow for the giveaway (2 tokens * 3 winners = 6 tokens)
+    const estimateAfterCreate =
+      await giveawayService.getTotalGalaFeesRequiredPlusEscrow(
+        giveawayCreator.profile._id as ObjectId,
+      );
+
+    // The new estimate should include the escrow for the unclaimed giveaway
+    expect(estimateAfterCreate.toNumber()).toBe(
+      initialFeeEstimate.toNumber() +
+        giveawayData.claimPerUser * giveawayData.maxWinners +
+        1, // +1 for gas fee
+    );
+    console.log('Initial estimate:', initialFeeEstimate.toNumber());
+    console.log('Estimate after create:', estimateAfterCreate.toNumber());
+
+    // 5. Create a user to partially claim the giveaway
+    const user1 = await createUser();
+
+    // 6. Have one user claim from the giveaway (1 of 3 potential claims)
+    await claimFCFSGiveaway(
+      user1,
+      giveawayId,
+      giveawayData.claimPerUser,
+      'user1',
+    );
+
+    // 7. Get fee estimate after partial claiming
+    // The escrow should be partially released (2 tokens claimed, 4 tokens still in escrow)
+    const estimateAfterPartialClaims =
+      await giveawayService.getTotalGalaFeesRequiredPlusEscrow(
+        giveawayCreator.profile._id as ObjectId,
+      );
+
+    // 8. The estimate after partial claims should show reduced escrow
+    console.log(
+      'Estimate after partial claims:',
+      estimateAfterPartialClaims.toNumber(),
+    );
+
+    // We should have 2 winners remaining (4 tokens) plus 1 gas fee
+    const expectedRemainingEscrow =
+      initialFeeEstimate.toNumber() +
+      giveawayData.claimPerUser * (giveawayData.maxWinners - 1) +
+      1; // -1 winner, +1 for gas fee
+
+    expect(estimateAfterPartialClaims.toNumber()).toBe(expectedRemainingEscrow);
+
+    // The escrow should be less than initial, but not fully released
+    expect(estimateAfterPartialClaims.toNumber()).toBeLessThan(
+      estimateAfterCreate.toNumber(),
+    );
+    expect(estimateAfterPartialClaims.toNumber()).toBeGreaterThan(
+      initialFeeEstimate.toNumber(),
+    );
+
+    // 9. Make sure the giveaway exists and shows the correct number of remaining claims
+    const response = await request(app.getHttpServer())
+      .get('/api/giveaway/all')
+      .set('Content-Type', 'application/json')
+      .expect(200);
+
+    const giveaway = response.body.find((g) => g._id === giveawayId);
+    console.log('Giveaway data from API:', JSON.stringify(giveaway, null, 2));
+    expect(giveaway).toBeDefined();
+
+    // Check that there are still claims left
+    expect(giveaway.claimsLeft).toBe(giveawayData.maxWinners - 1);
+
+    // 10. Verify that another user can still claim from the giveaway
+    const user2 = await createUser();
+    await claimFCFSGiveaway(
+      user2,
+      giveawayId,
+      giveawayData.claimPerUser,
+      'user2',
+    );
+
+    // 11. Get fee estimate after another claim
+    const estimateAfterMoreClaims =
+      await giveawayService.getTotalGalaFeesRequiredPlusEscrow(
+        giveawayCreator.profile._id as ObjectId,
+      );
+
+    console.log(
+      'Estimate after more claims:',
+      estimateAfterMoreClaims.toNumber(),
+    );
+
+    // Verify escrow decreased again but isn't fully released
+    // We should have 1 winner remaining (2 tokens)
+    const expectedRemainingEscrow2 =
+      initialFeeEstimate.toNumber() +
+      giveawayData.claimPerUser * (giveawayData.maxWinners - 2) +
+      1; // -2 winners, +1 for gas fee
+
+    expect(estimateAfterMoreClaims.toNumber()).toBe(expectedRemainingEscrow2);
+    expect(estimateAfterMoreClaims.toNumber()).toBeLessThan(
+      estimateAfterPartialClaims.toNumber(),
+    );
+    expect(estimateAfterMoreClaims.toNumber()).toBeGreaterThan(
+      initialFeeEstimate.toNumber(),
+    );
   });
 
   afterEach(async () => {

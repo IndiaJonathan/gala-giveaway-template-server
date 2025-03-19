@@ -10,6 +10,7 @@ import {
   ConflictException,
   Inject,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import { LinkDto } from '../dtos/profile.dto';
@@ -18,6 +19,7 @@ import { GiveawayService } from '../giveway-module/giveaway.service';
 import { GalachainApi } from '../web3-module/galachain.api';
 import { isAddress } from 'ethers';
 import { validateSignature } from '../utils/web3wallet';
+import { filterGiveawaysData } from '../utils/giveaway-utils';
 
 @Controller('api/profile')
 export class ProfileController {
@@ -141,6 +143,36 @@ export class ProfileController {
     } catch (error) {
       console.error(error);
       throw new BadRequestException('Failed to fetch balances');
+    }
+  }
+
+  /**
+   * Get all giveaways created by a user
+   * @param gcAddress The GalaChain address of the user
+   * @returns Array of giveaways created by the user
+   */
+  @Get('created-giveaways/:gcAddress')
+  async getCreatedGiveaways(@Param('gcAddress') gcAddress: string) {
+    try {
+      if (!gcAddress) {
+        throw new BadRequestException('GalaChain address is required');
+      }
+
+      const giveaways =
+        await this.giveawayService.getGiveawaysByCreator(gcAddress);
+
+      // Use the utility function to filter out giveawayErrors
+      return filterGiveawaysData(giveaways);
+    } catch (error) {
+      console.error('Error fetching created giveaways:', error);
+      if (error instanceof NotFoundException) {
+        throw new NotFoundException(
+          `User with GalaChain address ${gcAddress} not found`,
+        );
+      }
+      throw new BadRequestException(
+        `Failed to fetch created giveaways: ${error.message}`,
+      );
     }
   }
 }
