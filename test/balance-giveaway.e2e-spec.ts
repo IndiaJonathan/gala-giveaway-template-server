@@ -669,10 +669,6 @@ describe('Giveaway Controller (e2e)', () => {
       claimFCFSData,
     );
 
-    const winModel2 = app.get(getModelToken('Win'));
-    const test2 = await winModel2.find({}).exec();
-    console.log(test2);
-
     await request(app.getHttpServer())
       .post('/api/giveaway/fcfs/claim')
       .set('Content-Type', 'application/json')
@@ -704,7 +700,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     expect(winEntries.length).toBe(1);
     expect(winEntries[0].amountWon).toBe(fcfsGiveaway.claimPerUser);
-    expect(winEntries[0].claimed).toBe(false);
+    expect(winEntries[0].claimed).toBe(true);
   });
 
   it('should be able to create a new FCFS giveaway after claiming a previous one', async () => {
@@ -1316,6 +1312,89 @@ describe('Giveaway Controller (e2e)', () => {
     expect(estimateAfterMoreClaims.toNumber()).toBeGreaterThan(
       initialFeeEstimate.toNumber(),
     );
+  });
+
+  it('should mark Win entry as claimed when claiming an FCFS giveaway', async () => {
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
+      await createUser();
+
+    // Grant tokens to the creator's giveaway wallet
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    // Prepare a FCFS giveaway
+    const fcfsGiveaway = {
+      ...startBalanceGiveaway,
+      giveawayType: 'FirstComeFirstServe',
+      claimPerUser: 2,
+      maxWinners: 5,
+      uniqueKey: `giveaway-start-${new Date()}`,
+    };
+
+    const signedPayload = await giveawayCreatorSigner.sign(
+      'Start Giveaway',
+      fcfsGiveaway,
+    );
+
+    // Create FCFS giveaway
+    const createRes = await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(201);
+
+    expect(createRes.body.success).toBe(true);
+    const giveawayId = createRes.body.giveaway._id;
+
+    // Create a user to claim the giveaway
+    const { profile: userProfile, signer: userSigner } = await createUser();
+
+    // User claims the FCFS giveaway
+    const claimFCFSData = {
+      giveawayId,
+      uniqueKey: `giveaway-claim-${new Date()}`,
+    };
+
+    const signedPayload2 = await userSigner.sign(
+      'Claim FCFS Giveaway',
+      claimFCFSData,
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/fcfs/claim')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload2)
+      .expect((res) => {
+        expect(res.body).toMatchObject({
+          success: true,
+          message: expect.stringContaining(
+            `You successfully claimed ${fcfsGiveaway.claimPerUser} of GALA`,
+          ),
+          transactionDetails: {
+            Status: 1,
+            success: true,
+          },
+        });
+      })
+      .expect(201);
+
+    // Verify the Win entry was created and marked as claimed
+    const winModel = app.get(getModelToken('Win'));
+    const winEntries = await winModel
+      .find({
+        gcAddress: userProfile.galaChainAddress,
+        giveaway: giveawayId,
+      })
+      .exec();
+
+    expect(winEntries.length).toBe(1);
+    expect(winEntries[0].amountWon).toBe(fcfsGiveaway.claimPerUser);
+
+    // This assertion should fail since claimed is currently set to false
+    expect(winEntries[0].claimed).toBe(true);
   });
 
   afterEach(async () => {

@@ -499,6 +499,7 @@ export class GiveawayService {
       gcAddress,
       amountWon: giveaway.claimPerUser,
       completed: false,
+      claimed: true,
     }).save();
 
     const sendResult = await this.sendWinnings(
