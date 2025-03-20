@@ -102,7 +102,6 @@ describe('Profile related functions', () => {
         .mockReturnValue(mockGcAddress);
 
       // Create a mock profile service with a testable implementation of checkTelegramAuthorization
-      const realCheckAuth = profileService.checkTelegramAuthorization;
       const checkAuthSpy = jest.spyOn(
         profileService,
         'checkTelegramAuthorization',

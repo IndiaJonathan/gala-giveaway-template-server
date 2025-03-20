@@ -31,7 +31,7 @@ import { checkTokenEquality } from '../chain.helper';
 import { GALA_TOKEN } from '../constant';
 import { GasFeeEstimateRequestDto } from '../dtos/GasFeeEstimateRequest.dto';
 import { TokensAvailableDto } from '../dtos/TokensAvailable.dto';
-import { 
+import {
   filterGiveawaysData,
   filterGiveawayData,
 } from '../utils/giveaway-utils';

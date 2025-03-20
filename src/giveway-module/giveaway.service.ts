@@ -588,24 +588,23 @@ export class GiveawayService {
   getRequiredGalaGasFeeForGiveaway(
     giveawayDoc: GiveawayDto | GiveawayDocument | GasFeeEstimateRequestDto,
   ) {
-    // For GasFeeEstimateRequestDto, use the default gas fee
-    if ('userId' in giveawayDoc) {
+    // Check if it's a fully claimed FCFS giveaway
+    if (giveawayDoc.giveawayType === 'FirstComeFirstServe') {
+      let gasFee = giveawayDoc.maxWinners;
+      if (
+        'winners' in giveawayDoc &&
+        giveawayDoc.winners &&
+        giveawayDoc.winners.length
+      ) {
+        gasFee = giveawayDoc.maxWinners - giveawayDoc.winners.length;
+      }
+      return gasFee;
+    } else if (giveawayDoc.giveawayType === 'DistributedGiveaway') {
       return 1;
     }
-
-    // Check if it's a fully claimed FCFS giveaway
-    if (
-      giveawayDoc.giveawayType === 'FirstComeFirstServe' &&
-      'winners' in giveawayDoc &&
-      giveawayDoc.winners &&
-      giveawayDoc.winners.length >= giveawayDoc.maxWinners
-    ) {
-      // All tokens claimed, no gas fee needed
-      return 0;
-    }
-
-    // Default gas fee for any giveaway
-    return 1;
+    throw new BadRequestException(
+      `Giveaway type ${giveawayDoc.giveawayType} not supported`,
+    );
   }
 
   async getTotalGalaFeesRequiredPlusEscrow(

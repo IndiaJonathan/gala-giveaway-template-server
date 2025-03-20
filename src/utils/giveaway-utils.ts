@@ -9,7 +9,7 @@
  */
 export const filterGiveawayData = (giveaway: any): any => {
   if (!giveaway) return null;
-  
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { giveawayErrors, ...filteredGiveaway } = giveaway;
   return filteredGiveaway;
@@ -22,6 +22,6 @@ export const filterGiveawayData = (giveaway: any): any => {
  */
 export const filterGiveawaysData = (giveaways: any[]): any[] => {
   if (!giveaways || !Array.isArray(giveaways)) return [];
-  
+
   return giveaways.map(filterGiveawayData);
-}; 
+};

@@ -1223,7 +1223,7 @@ describe('Giveaway Controller (e2e)', () => {
     expect(estimateAfterCreate.toNumber()).toBe(
       initialFeeEstimate.toNumber() +
         giveawayData.claimPerUser * giveawayData.maxWinners +
-        1, // +1 for gas fee
+        giveawayData.maxWinners, // 1 gas fee per claim
     );
     console.log('Initial estimate:', initialFeeEstimate.toNumber());
     console.log('Estimate after create:', estimateAfterCreate.toNumber());
@@ -1253,10 +1253,11 @@ describe('Giveaway Controller (e2e)', () => {
     );
 
     // We should have 2 winners remaining (4 tokens) plus 1 gas fee
+    const newMaxWinners = giveawayData.maxWinners - 1;
     const expectedRemainingEscrow =
       initialFeeEstimate.toNumber() +
-      giveawayData.claimPerUser * (giveawayData.maxWinners - 1) +
-      1; // -1 winner, +1 for gas fee
+      giveawayData.claimPerUser * newMaxWinners +
+      newMaxWinners; // 1 gas fee per claim
 
     expect(estimateAfterPartialClaims.toNumber()).toBe(expectedRemainingEscrow);
 
