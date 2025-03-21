@@ -1455,6 +1455,198 @@ describe('Giveaway Controller (e2e)', () => {
     expect(response.body.giveawayWallet).toBe(profile.giveawayWalletAddress);
   });
 
+  it('should set paymentSent date when a payment is processed', async () => {
+    // Setup: Create a giveaway creator with tokens
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
+      await createUser();
+
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    // Create an FCFS giveaway
+    const fcfsGiveaway = {
+      ...startBalanceGiveaway,
+      giveawayType: 'FirstComeFirstServe',
+      claimPerUser: 2,
+      maxWinners: 3,
+      uniqueKey: `giveaway-start-${new Date().getTime()}`,
+    };
+
+    const signedPayload = await giveawayCreatorSigner.sign(
+      'Start Giveaway',
+      fcfsGiveaway,
+    );
+
+    const createRes = await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(201);
+
+    expect(createRes.body.success).toBe(true);
+    const giveawayId = createRes.body.giveaway._id;
+
+    // Create a user to claim the giveaway
+    const { profile: userProfile, signer: userSigner } = await createUser();
+
+    // User claims the FCFS giveaway
+    const claimFCFSData = {
+      giveawayId,
+      uniqueKey: `giveaway-claim-${new Date().getTime()}`,
+    };
+
+    const signedClaimPayload = await userSigner.sign(
+      'Claim FCFS Giveaway',
+      claimFCFSData,
+    );
+
+    const beforeClaimTime = new Date();
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/fcfs/claim')
+      .set('Content-Type', 'application/json')
+      .send(signedClaimPayload)
+      .expect(201);
+
+    const afterClaimTime = new Date();
+
+    // Get the PaymentStatus model and check if paymentSent is set
+    const paymentStatusModel = app.get(getModelToken('PaymentStatus'));
+    const paymentStatusEntries = await paymentStatusModel
+      .find({
+        gcAddress: userProfile.galaChainAddress,
+        giveaway: giveawayId,
+      })
+      .exec();
+
+    // Verify payment status was created
+    expect(paymentStatusEntries.length).toBe(1);
+
+    // Verify paymentSent is a valid date
+    const paymentStatus = paymentStatusEntries[0];
+    expect(paymentStatus.paymentSent).toBeDefined();
+    expect(paymentStatus.paymentSent instanceof Date).toBe(true);
+
+    // Verify the date is within a reasonable timeframe (between before and after the claim)
+    expect(paymentStatus.paymentSent.getTime()).toBeGreaterThanOrEqual(
+      beforeClaimTime.getTime(),
+    );
+    expect(paymentStatus.paymentSent.getTime()).toBeLessThanOrEqual(
+      afterClaimTime.getTime() + 1000,
+    ); // Add a small buffer
+
+    // Verify amount is set correctly
+    expect(paymentStatus.amount).toBeDefined();
+    expect(paymentStatus.amount).toBe(fcfsGiveaway.claimPerUser.toString());
+
+    // Verify winningInfo is also set
+    expect(paymentStatus.winningInfo).toBeDefined();
+  });
+
+  it('should set paymentSent date when distributed giveaway payments are processed', async () => {
+    // Setup: Create a giveaway creator with tokens
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
+      await createUser();
+
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    // Create a DistributedGiveaway
+    const distributedGiveaway = {
+      ...startBalanceGiveaway,
+      giveawayType: 'DistributedGiveaway',
+      tokenQuantity: '5',
+      maxWinners: '1',
+      uniqueKey: `giveaway-start-${new Date().getTime()}`,
+    };
+
+    const signedPayload = await giveawayCreatorSigner.sign(
+      'Start Giveaway',
+      distributedGiveaway,
+    );
+
+    const createRes = await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(201);
+
+    expect(createRes.body.success).toBe(true);
+    const giveawayId = createRes.body.giveaway._id;
+
+    // Create a user to sign up for the giveaway
+    const { profile: userProfile, signer: userSigner } = await createUser();
+
+    // User signs up for the giveaway
+    const signupData = {
+      giveawayId,
+      uniqueKey: `giveaway-signup-${new Date().getTime()}`,
+    };
+
+    const signedSignupPayload = await userSigner.sign('Signup', signupData);
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/signup')
+      .set('Content-Type', 'application/json')
+      .send(signedSignupPayload)
+      .expect(201);
+
+    // Force end the giveaway to trigger distribution
+    const ended = await endGiveaway(giveawayId);
+    expect(ended.acknowledged).toBe(true);
+
+    // Process the giveaway (triggers the payments)
+    await giveawayScheduler.handleCron();
+
+    // Verify the giveaway is now completed
+    await request(app.getHttpServer())
+      .get('/api/giveaway/all')
+      .set('Content-Type', 'application/json')
+      .expect(200)
+      .expect((res) => {
+        const giveaway = res.body.find((g) => g._id === giveawayId);
+        expect(giveaway).toBeDefined();
+        expect(giveaway.giveawayStatus).toBe(GiveawayStatus.Completed);
+      });
+
+    // Get the PaymentStatus model and check if paymentSent is set
+    const paymentStatusModel = app.get(getModelToken('PaymentStatus'));
+    const paymentStatusEntries = await paymentStatusModel
+      .find({
+        gcAddress: userProfile.galaChainAddress,
+        giveaway: giveawayId,
+      })
+      .exec();
+
+    // Verify payment status was created
+    expect(paymentStatusEntries.length).toBe(1);
+
+    // Verify paymentSent is a valid date
+    const paymentStatus = paymentStatusEntries[0];
+    expect(paymentStatus.paymentSent).toBeDefined();
+    expect(paymentStatus.paymentSent instanceof Date).toBe(true);
+
+    // Verify the date is recent (within the last minute)
+    const now = new Date();
+    const oneMinuteAgo = new Date(now.getTime() - 60000);
+    expect(paymentStatus.paymentSent.getTime()).toBeGreaterThan(
+      oneMinuteAgo.getTime(),
+    );
+
+    // Verify amount is set correctly
+    expect(paymentStatus.amount).toBeDefined();
+    expect(paymentStatus.amount).toBe(distributedGiveaway.tokenQuantity);
+
+    // Verify winningInfo is also set
+    expect(paymentStatus.winningInfo).toBeDefined();
+  });
+
   afterEach(async () => {
     try {
       await memoryServer.stop();

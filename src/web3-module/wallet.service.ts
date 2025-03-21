@@ -32,13 +32,12 @@ export class WalletService {
           BigNumber(tokenAllowance.usesSpent),
         );
 
-        if (quantityAvailable < usesAvailable) {
+        if (usesAvailable < quantityAvailable) {
           //Handling it this way to ensure that the available quantity can work with available uses
-          const useableQuantity = quantityAvailable.minus(usesAvailable);
-          totalQuantity = totalQuantity.plus(useableQuantity);
+          totalQuantity = totalQuantity.plus(usesAvailable);
 
           unusableQuantity = unusableQuantity.plus(
-            quantityAvailable.minus(useableQuantity),
+            quantityAvailable.minus(usesAvailable),
           );
 
           //TODO: Handle the full quantity if possible

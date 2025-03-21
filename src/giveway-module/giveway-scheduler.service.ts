@@ -11,6 +11,9 @@ import { APP_SECRETS } from '../secrets/secrets.module';
 import { GiveawayDocument, GiveawayStatus } from '../schemas/giveaway.schema';
 import { GalachainApi } from '../web3-module/galachain.api';
 import { GiveawayTokenType } from '../dtos/giveaway.dto';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { PaymentStatusDocument } from '../schemas/PaymentStatusSchema';
 
 @Injectable()
 export class GivewayScheduler {
@@ -19,6 +22,8 @@ export class GivewayScheduler {
     private galachainApi: GalachainApi,
     private profileService: ProfileService,
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
+    @InjectModel('PaymentStatus')
+    private readonly paymentStatusModel: Model<PaymentStatusDocument>,
   ) {}
 
   @Cron('0 * * * * *') // This cron expression runs every minute on the 0th second
@@ -87,6 +92,18 @@ export class GivewayScheduler {
             if (mintResult.Status === 1) {
               giveaway.giveawayStatus = GiveawayStatus.Completed;
               console.log(`Giveway done!`);
+
+              // Create payment status records for each winner
+              for (const winner of winners) {
+                const paymentStatus = new this.paymentStatusModel({
+                  giveaway: giveaway.id,
+                  gcAddress: winner.gcAddress,
+                  winningInfo: JSON.stringify(mintResult),
+                  paymentSent: new Date(),
+                  amount: winner.winAmount,
+                });
+                await paymentStatus.save();
+              }
             } else {
               giveaway.giveawayErrors.push((mintResult as any).message);
               console.log(
@@ -139,7 +156,7 @@ export class GivewayScheduler {
               if (index === -1) {
                 await throwAndLogGiveawayError(
                   giveaway,
-                  `Unable to find gcAddre[ss for winner. Winner: ${owner}`,
+                  `Unable to find gcAddress for winner. Winner: ${owner}`,
                 );
               }
 
@@ -147,6 +164,15 @@ export class GivewayScheduler {
                 giveaway.winners[index].error = transferResult.error;
               } else {
                 giveaway.winners[index].completed = true;
+                // Create payment status record for successful transfer
+                const paymentStatus = new this.paymentStatusModel({
+                  giveaway: giveaway.id,
+                  gcAddress: owner,
+                  winningInfo: JSON.stringify(transferResult.result),
+                  paymentSent: new Date(),
+                  amount: giveaway.winners[index].winAmount,
+                });
+                await paymentStatus.save();
               }
             }
 

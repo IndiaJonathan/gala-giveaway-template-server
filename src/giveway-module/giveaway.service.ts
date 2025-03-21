@@ -514,6 +514,8 @@ export class GiveawayService {
     });
     await giveaway.save();
     paymentStatus.winningInfo = JSON.stringify(sendResult);
+    paymentStatus.paymentSent = new Date();
+    paymentStatus.amount = giveaway.claimPerUser.toString();
     await paymentStatus.save();
     if (sendResult.Status === 1) {
       // Create a user-friendly token name using the tokenToReadable function
