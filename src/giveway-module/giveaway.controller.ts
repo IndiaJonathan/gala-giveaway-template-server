@@ -206,18 +206,23 @@ export class GiveawayController {
   @Post('fcfs/claim')
   async claimFCFS(@Body() giveawayDto: ClaimFCFSRequestDTO) {
     const gc_address = validateSignature(giveawayDto);
-    const winEntry = await this.giveawayService.claimFCFS(giveawayDto, gc_address);
-    
+    const winEntry = await this.giveawayService.claimFCFS(
+      giveawayDto,
+      gc_address,
+    );
+
     // Format the response to match the expected format in tests
-    const paymentInfo = winEntry.winningInfo ? JSON.parse(winEntry.winningInfo) : {};
-    
+    const paymentInfo = winEntry.winningInfo
+      ? JSON.parse(winEntry.winningInfo)
+      : {};
+
     return {
       success: true,
       message: `You successfully claimed ${winEntry.amountWon} of GALA`,
       transactionDetails: {
         Status: paymentInfo.Status || 1,
-        success: true
-      }
+        success: true,
+      },
     };
   }
 

@@ -102,6 +102,7 @@ export class GivewayScheduler {
                   claimed: true, // Mark as claimed since no burn required and tokens already sent
                   winningInfo: JSON.stringify(mintResult),
                   paymentSent: new Date(),
+                  giveawayType: giveaway.giveawayType,
                 });
                 await winEntry.save();
               }
@@ -175,6 +176,7 @@ export class GivewayScheduler {
                     claimed: true, // Mark as claimed since no burn required and tokens already sent
                     winningInfo: JSON.stringify(transferResult.result),
                     paymentSent: new Date(),
+                    giveawayType: giveaway.giveawayType,
                   });
                   await winEntry.save();
                 }

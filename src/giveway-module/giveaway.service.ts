@@ -247,12 +247,19 @@ export class GiveawayService {
   }
 
   async createWinClaimsFromWinners(giveawayId: ObjectId, winners: Winner[]) {
+    // Get the giveaway to access its type
+    const giveaway = await this.giveawayModel.findById(giveawayId).exec();
+    if (!giveaway) {
+      throw new NotFoundException(`Giveaway with ID ${giveawayId} not found`);
+    }
+
     const claimableWins = winners.map(
       (winner) =>
         new this.winModel({
           giveaway: giveawayId,
           amountWon: winner.winAmount,
           gcAddress: winner.gcAddress,
+          giveawayType: giveaway.giveawayType,
         }),
     );
     try {
@@ -477,6 +484,7 @@ export class GiveawayService {
       gcAddress,
       amountWon: giveaway.claimPerUser,
       claimed: true,
+      giveawayType: giveaway.giveawayType,
     });
 
     if (giveaway.burnToken) {
@@ -500,7 +508,8 @@ export class GiveawayService {
         giveaway.creator,
       );
 
-      const decryptedKey = await creatorProfile.decryptPrivateKey(encryptionKey);
+      const decryptedKey =
+        await creatorProfile.decryptPrivateKey(encryptionKey);
       const giveawayWalletSigner = new SigningClient(decryptedKey);
 
       let paymentResult;
