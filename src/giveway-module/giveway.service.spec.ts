@@ -10,6 +10,7 @@ import { MockGalachainApi } from '../../test/mocks/mock-galachain.api';
 import { WalletService } from '../web3-module/wallet.service';
 import { GiveawayTokenType } from '../dtos/giveaway.dto';
 import { GasFeeEstimateRequestDto } from '../dtos/GasFeeEstimateRequest.dto';
+import { APP_SECRETS } from '../secrets/secrets.module';
 
 describe('GiveawayService', () => {
   let giveawayService: GiveawayService;
@@ -26,25 +27,36 @@ describe('GiveawayService', () => {
       imports: [SecretConfigModule],
       providers: [
         GiveawayService,
-        ProfileService,
-        GalachainApi,
-        WalletService,
         {
           provide: getModelToken('Giveaway'),
-          useValue: mockModel,
+          useValue: {
+            new: jest.fn().mockResolvedValue(mockModel),
+            constructor: jest.fn().mockResolvedValue(mockModel),
+            find: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            create: jest.fn(),
+            remove: jest.fn(),
+            exec: jest.fn(),
+          },
         },
         {
           provide: getModelToken('Win'),
-          useValue: mockModel,
+          useValue: {
+            new: jest.fn().mockResolvedValue(mockModel),
+            constructor: jest.fn().mockResolvedValue(mockModel),
+            find: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            create: jest.fn(),
+            remove: jest.fn(),
+            exec: jest.fn(),
+          },
         },
-        {
-          provide: getModelToken('Profile'),
-          useValue: mockModel,
-        },
-        {
-          provide: getModelToken('PaymentStatus'),
-          useValue: mockModel,
-        },
+        { provide: ProfileService, useValue: mockModel },
+        { provide: GalachainApi, useValue: MockGalachainApi },
+        { provide: WalletService, useValue: mockModel },
+        { provide: APP_SECRETS, useValue: mockModel },
       ],
     })
       .overrideProvider(GalachainApi)

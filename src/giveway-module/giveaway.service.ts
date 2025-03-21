@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Inject,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -33,7 +32,6 @@ import {
 import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
 import { BurnTokenQuantityDto } from '../dtos/BurnTokenQuantity.dto';
 import { GalachainApi } from '../web3-module/galachain.api';
-import { PaymentStatusDocument } from '../schemas/PaymentStatusSchema';
 import { WalletService } from '../web3-module/wallet.service';
 import { GasFeeEstimateRequestDto } from '../dtos/GasFeeEstimateRequest.dto';
 import { filterGiveawayData } from '../utils/giveaway-utils';
@@ -45,8 +43,6 @@ export class GiveawayService {
     private readonly giveawayModel: Model<GiveawayDocument>,
     @InjectModel('Win')
     private readonly winModel: Model<WinDocument>,
-    @InjectModel('PaymentStatus') // Inject the Mongoose model for Profile
-    private readonly paymentStatusModel: Model<PaymentStatusDocument>,
     private profileService: ProfileService,
     @Inject(GalachainApi) private galachainApi: GalachainApi,
     @Inject(WalletService) private walletService: WalletService,
@@ -354,7 +350,6 @@ export class GiveawayService {
       ([gcAddress, winCount]) => ({
         gcAddress,
         winAmount: winCount.toString(),
-        isDistributed: false,
         completed: false,
       }),
     );
@@ -475,9 +470,14 @@ export class GiveawayService {
       throw new BadRequestException('Giveway lacks claim per user');
 
     await this.runGiveawayChecks(giveaway, gcAddress);
-    const paymentStatus = new this.paymentStatusModel();
-    paymentStatus.gcAddress = gcAddress;
-    paymentStatus.giveaway = giveaway.id;
+
+    // Create the win entry that will track both the win and payment status
+    const winEntry = new this.winModel({
+      giveaway: giveaway.id,
+      gcAddress,
+      amountWon: giveaway.claimPerUser,
+      claimed: true,
+    });
 
     if (giveaway.burnToken) {
       this.runBurnChecks(giveaway, claimDto.tokenInstances);
@@ -490,45 +490,69 @@ export class GiveawayService {
         );
       }
 
-      paymentStatus.burnInfo = JSON.stringify(paymentStatus);
-      await paymentStatus.save();
+      winEntry.burnInfo = JSON.stringify(result);
     }
 
-    await new this.winModel({
-      giveaway: giveaway.id,
-      gcAddress,
-      amountWon: giveaway.claimPerUser,
-      completed: false,
-      claimed: true,
-    }).save();
+    // Actually send the tokens to the user
+    try {
+      const encryptionKey = this.secrets['ENCRYPTION_KEY'];
+      const creatorProfile = await this.profileService.findProfile(
+        giveaway.creator,
+      );
 
-    const sendResult = await this.sendWinnings(
-      gcAddress,
-      new BigNumber(giveaway.claimPerUser),
-      giveaway,
-    );
-    giveaway.winners.push({
+      const decryptedKey = await creatorProfile.decryptPrivateKey(encryptionKey);
+      const giveawayWalletSigner = new SigningClient(decryptedKey);
+
+      let paymentResult;
+      if (giveaway.giveawayTokenType === GiveawayTokenType.BALANCE) {
+        // Transfer token if it's a balance token
+        paymentResult = await this.galachainApi.transferToken(
+          {
+            quantity: new BigNumber(giveaway.claimPerUser),
+            to: gcAddress,
+            tokenInstance: {
+              ...giveaway.giveawayToken,
+              instance: new BigNumber(0),
+            },
+          },
+          giveawayWalletSigner,
+        );
+      } else if (giveaway.giveawayTokenType === GiveawayTokenType.ALLOWANCE) {
+        // Mint token if it's an allowance token
+        paymentResult = await this.galachainApi.mintToken(
+          {
+            quantity: new BigNumber(giveaway.claimPerUser),
+            tokenClass: giveaway.giveawayToken,
+            owner: gcAddress,
+          },
+          giveawayWalletSigner,
+        );
+      }
+
+      // Mark payment as sent and store payment info
+      winEntry.paymentSent = new Date();
+      winEntry.winningInfo = JSON.stringify(paymentResult);
+    } catch (error) {
+      console.error('Error sending payment:', error);
+      throw new BadRequestException(
+        `Failed to send payment: ${error.message || JSON.stringify(error)}`,
+      );
+    }
+
+    // Save the win entry
+    await winEntry.save();
+
+    // Update the giveaway with the new winner
+    const winner: Winner = {
       gcAddress,
       winAmount: giveaway.claimPerUser.toString(),
       completed: true,
-    });
+    };
+
+    giveaway.winners.push(winner);
     await giveaway.save();
-    paymentStatus.winningInfo = JSON.stringify(sendResult);
-    paymentStatus.paymentSent = new Date();
-    paymentStatus.amount = giveaway.claimPerUser.toString();
-    await paymentStatus.save();
-    if (sendResult.Status === 1) {
-      // Create a user-friendly token name using the tokenToReadable function
-      const tokenName = tokenToReadable(giveaway.giveawayToken);
-      // Return a friendly message that includes the claimed amount and token
-      return {
-        message: `You successfully claimed ${giveaway.claimPerUser} of ${tokenName}`,
-        transactionDetails: sendResult,
-        success: true,
-      };
-    } else {
-      throw new InternalServerErrorException(sendResult);
-    }
+
+    return winEntry;
   }
 
   async validateGiveawayIsActive(giveawayId: string): Promise<void> {

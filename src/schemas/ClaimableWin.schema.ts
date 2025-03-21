@@ -7,6 +7,9 @@ export interface WinDocument extends Document {
   gcAddress: string;
   claimed: boolean;
   claimInfo: string;
+  burnInfo: string;
+  winningInfo: string;
+  paymentSent: Date;
 }
 
 export const WinSchema = new Schema<WinDocument>({
@@ -15,6 +18,9 @@ export const WinSchema = new Schema<WinDocument>({
   gcAddress: { type: String, required: true },
   claimInfo: { type: String, required: false },
   claimed: { type: Boolean, default: false },
+  burnInfo: { type: String, required: false },
+  winningInfo: { type: String, required: false },
+  paymentSent: { type: Date, required: false },
 });
 
 export const Win = model<WinDocument>('Win', WinSchema);

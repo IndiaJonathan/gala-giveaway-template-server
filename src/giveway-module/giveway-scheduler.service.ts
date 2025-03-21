@@ -13,7 +13,6 @@ import { GalachainApi } from '../web3-module/galachain.api';
 import { GiveawayTokenType } from '../dtos/giveaway.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { PaymentStatusDocument } from '../schemas/PaymentStatusSchema';
 import { WinDocument } from '../schemas/ClaimableWin.schema';
 
 @Injectable()
@@ -23,8 +22,6 @@ export class GivewayScheduler {
     private galachainApi: GalachainApi,
     private profileService: ProfileService,
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
-    @InjectModel('PaymentStatus')
-    private readonly paymentStatusModel: Model<PaymentStatusDocument>,
     @InjectModel('Win')
     private readonly winModel: Model<WinDocument>,
   ) {}
@@ -96,25 +93,17 @@ export class GivewayScheduler {
               giveaway.giveawayStatus = GiveawayStatus.Completed;
               console.log(`Giveway done!`);
 
-              // Create payment status records for each winner
+              // Create win entries for each winner
               for (const winner of winners) {
-                // Create win entry for distributed giveaways without burn requirements
                 const winEntry = new this.winModel({
                   giveaway: giveaway.id,
                   amountWon: winner.winAmount,
                   gcAddress: winner.gcAddress,
                   claimed: true, // Mark as claimed since no burn required and tokens already sent
-                });
-                await winEntry.save();
-
-                const paymentStatus = new this.paymentStatusModel({
-                  giveaway: giveaway.id,
-                  gcAddress: winner.gcAddress,
                   winningInfo: JSON.stringify(mintResult),
                   paymentSent: new Date(),
-                  amount: winner.winAmount,
                 });
-                await paymentStatus.save();
+                await winEntry.save();
               }
             } else {
               giveaway.giveawayErrors.push((mintResult as any).message);
@@ -184,19 +173,11 @@ export class GivewayScheduler {
                     amountWon: giveaway.winners[index].winAmount,
                     gcAddress: owner,
                     claimed: true, // Mark as claimed since no burn required and tokens already sent
+                    winningInfo: JSON.stringify(transferResult.result),
+                    paymentSent: new Date(),
                   });
                   await winEntry.save();
                 }
-
-                // Create payment status record for successful transfer
-                const paymentStatus = new this.paymentStatusModel({
-                  giveaway: giveaway.id,
-                  gcAddress: owner,
-                  winningInfo: JSON.stringify(transferResult.result),
-                  paymentSent: new Date(),
-                  amount: giveaway.winners[index].winAmount,
-                });
-                await paymentStatus.save();
               }
             }
 

@@ -4,7 +4,6 @@ import { ProfileSchema } from '../schemas/ProfileSchema';
 import { APP_SECRETS, SecretConfigModule } from '../secrets/secrets.module';
 import { Module } from '@nestjs/common';
 import { WinSchema } from '../schemas/ClaimableWin.schema';
-import { PaymentStatusSchema } from '../schemas/PaymentStatusSchema';
 
 @Module({
   imports: [
@@ -26,7 +25,6 @@ import { PaymentStatusSchema } from '../schemas/PaymentStatusSchema';
       { name: 'Profile', schema: ProfileSchema },
       { name: 'Giveaway', schema: GiveawaySchema },
       { name: 'Win', schema: WinSchema },
-      { name: 'PaymentStatus', schema: PaymentStatusSchema },
     ]),
   ],
   exports: [MongooseModule],

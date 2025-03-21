@@ -1526,37 +1526,37 @@ describe('Giveaway Controller (e2e)', () => {
 
     const afterClaimTime = new Date();
 
-    // Get the PaymentStatus model and check if paymentSent is set
-    const paymentStatusModel = app.get(getModelToken('PaymentStatus'));
-    const paymentStatusEntries = await paymentStatusModel
+    // Get the Win model and check if paymentSent is set
+    const winModel = app.get(getModelToken('Win'));
+    const winEntries = await winModel
       .find({
         gcAddress: userProfile.galaChainAddress,
         giveaway: giveawayId,
       })
       .exec();
 
-    // Verify payment status was created
-    expect(paymentStatusEntries.length).toBe(1);
+    // Verify win entry was created
+    expect(winEntries.length).toBe(1);
 
     // Verify paymentSent is a valid date
-    const paymentStatus = paymentStatusEntries[0];
-    expect(paymentStatus.paymentSent).toBeDefined();
-    expect(paymentStatus.paymentSent instanceof Date).toBe(true);
+    const winEntry = winEntries[0];
+    expect(winEntry.paymentSent).toBeDefined();
+    expect(winEntry.paymentSent instanceof Date).toBe(true);
 
     // Verify the date is within a reasonable timeframe (between before and after the claim)
-    expect(paymentStatus.paymentSent.getTime()).toBeGreaterThanOrEqual(
+    expect(winEntry.paymentSent.getTime()).toBeGreaterThanOrEqual(
       beforeClaimTime.getTime(),
     );
-    expect(paymentStatus.paymentSent.getTime()).toBeLessThanOrEqual(
+    expect(winEntry.paymentSent.getTime()).toBeLessThanOrEqual(
       afterClaimTime.getTime() + 1000,
     ); // Add a small buffer
 
     // Verify amount is set correctly
-    expect(paymentStatus.amount).toBeDefined();
-    expect(paymentStatus.amount).toBe(fcfsGiveaway.claimPerUser.toString());
+    expect(winEntry.amountWon).toBeDefined();
+    expect(winEntry.amountWon).toBe(fcfsGiveaway.claimPerUser.toString());
 
     // Verify winningInfo is also set
-    expect(paymentStatus.winningInfo).toBeDefined();
+    expect(winEntry.winningInfo).toBeDefined();
   });
 
   it('should set paymentSent date when distributed giveaway payments are processed', async () => {
@@ -1628,36 +1628,36 @@ describe('Giveaway Controller (e2e)', () => {
         expect(giveaway.giveawayStatus).toBe(GiveawayStatus.Completed);
       });
 
-    // Get the PaymentStatus model and check if paymentSent is set
-    const paymentStatusModel = app.get(getModelToken('PaymentStatus'));
-    const paymentStatusEntries = await paymentStatusModel
+    // Get the Win model and check if paymentSent is set
+    const winModel = app.get(getModelToken('Win'));
+    const winEntries = await winModel
       .find({
         gcAddress: userProfile.galaChainAddress,
         giveaway: giveawayId,
       })
       .exec();
 
-    // Verify payment status was created
-    expect(paymentStatusEntries.length).toBe(1);
+    // Verify win entry was created
+    expect(winEntries.length).toBe(1);
 
     // Verify paymentSent is a valid date
-    const paymentStatus = paymentStatusEntries[0];
-    expect(paymentStatus.paymentSent).toBeDefined();
-    expect(paymentStatus.paymentSent instanceof Date).toBe(true);
+    const winEntry = winEntries[0];
+    expect(winEntry.paymentSent).toBeDefined();
+    expect(winEntry.paymentSent instanceof Date).toBe(true);
 
     // Verify the date is recent (within the last minute)
     const now = new Date();
     const oneMinuteAgo = new Date(now.getTime() - 60000);
-    expect(paymentStatus.paymentSent.getTime()).toBeGreaterThan(
+    expect(winEntry.paymentSent.getTime()).toBeGreaterThan(
       oneMinuteAgo.getTime(),
     );
 
     // Verify amount is set correctly
-    expect(paymentStatus.amount).toBeDefined();
-    expect(paymentStatus.amount).toBe(distributedGiveaway.tokenQuantity);
+    expect(winEntry.amountWon).toBeDefined();
+    expect(winEntry.amountWon).toBe(distributedGiveaway.tokenQuantity);
 
     // Verify winningInfo is also set
-    expect(paymentStatus.winningInfo).toBeDefined();
+    expect(winEntry.winningInfo).toBeDefined();
   });
 
   it('should create Win entries for distributed giveaways', async () => {
