@@ -3,7 +3,7 @@ import { GiveawayDocument } from './giveaway.schema';
 
 export interface WinDocument extends Document {
   giveaway: GiveawayDocument;
-  amountWon: number;
+  amountWon: string;
   gcAddress: string;
   claimed: boolean;
   claimInfo: string;
@@ -11,7 +11,7 @@ export interface WinDocument extends Document {
 
 export const WinSchema = new Schema<WinDocument>({
   giveaway: { type: Schema.Types.ObjectId, ref: 'Giveaway', required: true },
-  amountWon: { type: Number, required: true },
+  amountWon: { type: String, required: true },
   gcAddress: { type: String, required: true },
   claimInfo: { type: String, required: false },
   claimed: { type: Boolean, default: false },

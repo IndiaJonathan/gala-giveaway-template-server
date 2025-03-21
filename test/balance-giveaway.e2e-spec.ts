@@ -22,6 +22,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { GiveawayTokenType } from '../src/dtos/giveaway.dto';
 import { GiveawayService } from '../src/giveway-module/giveaway.service';
 import { ObjectId } from 'mongodb';
+import BigNumber from 'bignumber.js';
 
 jest.setTimeout(50000);
 describe('Giveaway Controller (e2e)', () => {
@@ -635,8 +636,8 @@ describe('Giveaway Controller (e2e)', () => {
     const fcfsGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'FirstComeFirstServe',
-      claimPerUser: 2,
-      maxWinners: 5,
+      claimPerUser: '2',
+      maxWinners: '5',
       uniqueKey: `giveaway-start-${new Date()}`,
     };
 
@@ -718,8 +719,8 @@ describe('Giveaway Controller (e2e)', () => {
     const fcfsGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'FirstComeFirstServe',
-      claimPerUser: 1,
-      maxWinners: 1,
+      claimPerUser: '1',
+      maxWinners: '1',
     };
 
     const signedPayload = await giveawayCreatorSigner.sign(
@@ -830,8 +831,8 @@ describe('Giveaway Controller (e2e)', () => {
     // Helper function to create and verify a FCFS giveaway
     const createFCFSGiveaway = async (
       creator,
-      claimPerUser = 1,
-      maxWinners = 1,
+      claimPerUser = '1',
+      maxWinners = '1',
     ) => {
       const giveawayData = {
         ...startBalanceGiveaway,
@@ -965,8 +966,8 @@ describe('Giveaway Controller (e2e)', () => {
     // Helper functions for creating FCFS giveaways and claiming them
     const createFCFSGiveaway = async (
       creator,
-      claimPerUser = 1,
-      maxWinners = 2,
+      claimPerUser = '1',
+      maxWinners = '2',
     ) => {
       const giveawayData = {
         ...startBalanceGiveaway,
@@ -1046,8 +1047,8 @@ describe('Giveaway Controller (e2e)', () => {
     // 3. Create an FCFS giveaway with 2 max winners, 1 token per claim
     const { giveawayId, giveawayData } = await createFCFSGiveaway(
       giveawayCreator,
-      1, // claimPerUser
-      2, // maxWinners
+      '1', // claimPerUser
+      '2', // maxWinners
     );
 
     // 4. Get fee estimate after creating giveaway but before claims
@@ -1114,7 +1115,11 @@ describe('Giveaway Controller (e2e)', () => {
 
     // 10. Verify creating a new giveaway with the same parameters now works
     // (since escrow is released)
-    const newGiveawayResult = await createFCFSGiveaway(giveawayCreator, 1, 2);
+    const newGiveawayResult = await createFCFSGiveaway(
+      giveawayCreator,
+      '1',
+      '2',
+    );
 
     expect(newGiveawayResult.giveawayId).toBeDefined();
   });
@@ -1123,8 +1128,8 @@ describe('Giveaway Controller (e2e)', () => {
     // Helper functions for creating FCFS giveaways and claiming them
     const createFCFSGiveaway = async (
       creator,
-      claimPerUser = 1,
-      maxWinners = 3,
+      claimPerUser = '1',
+      maxWinners = '3',
     ) => {
       const giveawayData = {
         ...startBalanceGiveaway,
@@ -1204,8 +1209,8 @@ describe('Giveaway Controller (e2e)', () => {
     // 3. Create an FCFS giveaway with 3 max winners, 2 tokens per claim (total: 6 tokens)
     const { giveawayId, giveawayData } = await createFCFSGiveaway(
       giveawayCreator,
-      2, // claimPerUser
-      3, // maxWinners
+      '2', // claimPerUser
+      '3', // maxWinners
     );
 
     // 4. Get fee estimate after creating giveaway but before claims
@@ -1218,8 +1223,10 @@ describe('Giveaway Controller (e2e)', () => {
     // The new estimate should include the escrow for the unclaimed giveaway
     expect(estimateAfterCreate.toNumber()).toBe(
       initialFeeEstimate.toNumber() +
-        giveawayData.claimPerUser * giveawayData.maxWinners +
-        giveawayData.maxWinners, // 1 gas fee per claim
+        BigNumber(giveawayData.claimPerUser)
+          .multipliedBy(giveawayData.maxWinners)
+          .plus(giveawayData.maxWinners)
+          .toNumber(), // 1 gas fee per claim
     );
     console.log('Initial estimate:', initialFeeEstimate.toNumber());
     console.log('Estimate after create:', estimateAfterCreate.toNumber());
@@ -1249,11 +1256,13 @@ describe('Giveaway Controller (e2e)', () => {
     );
 
     // We should have 2 winners remaining (4 tokens) plus 1 gas fee
-    const newMaxWinners = giveawayData.maxWinners - 1;
+    const newMaxWinners = new BigNumber(giveawayData.maxWinners).minus(1);
     const expectedRemainingEscrow =
       initialFeeEstimate.toNumber() +
-      giveawayData.claimPerUser * newMaxWinners +
-      newMaxWinners; // 1 gas fee per claim
+      new BigNumber(giveawayData.claimPerUser)
+        .multipliedBy(newMaxWinners)
+        .toNumber() +
+      newMaxWinners.toNumber(); // 1 gas fee per claim
 
     expect(estimateAfterPartialClaims.toNumber()).toBe(expectedRemainingEscrow);
 
@@ -1276,7 +1285,9 @@ describe('Giveaway Controller (e2e)', () => {
     expect(giveaway).toBeDefined();
 
     // Check that there are still claims left
-    expect(giveaway.claimsLeft).toBe(giveawayData.maxWinners - 1);
+    expect(giveaway.claimsLeft).toBe(
+      new BigNumber(giveawayData.maxWinners).minus(1).toNumber(),
+    );
 
     // 10. Verify that another user can still claim from the giveaway
     const user2 = await createUser();
@@ -1302,7 +1313,9 @@ describe('Giveaway Controller (e2e)', () => {
     // We should have 1 winner remaining (2 tokens)
     const expectedRemainingEscrow2 =
       initialFeeEstimate.toNumber() +
-      giveawayData.claimPerUser * (giveawayData.maxWinners - 2) +
+      new BigNumber(giveawayData.claimPerUser)
+        .multipliedBy(new BigNumber(giveawayData.maxWinners).minus(2))
+        .toNumber() +
       1; // -2 winners, +1 for gas fee
 
     expect(estimateAfterMoreClaims.toNumber()).toBe(expectedRemainingEscrow2);
@@ -1329,8 +1342,8 @@ describe('Giveaway Controller (e2e)', () => {
     const fcfsGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'FirstComeFirstServe',
-      claimPerUser: 2,
-      maxWinners: 5,
+      claimPerUser: '2',
+      maxWinners: '5',
       uniqueKey: `giveaway-start-${new Date()}`,
     };
 
@@ -1470,8 +1483,8 @@ describe('Giveaway Controller (e2e)', () => {
     const fcfsGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'FirstComeFirstServe',
-      claimPerUser: 2,
-      maxWinners: 3,
+      claimPerUser: '2',
+      maxWinners: '3',
       uniqueKey: `giveaway-start-${new Date().getTime()}`,
     };
 
@@ -1645,6 +1658,189 @@ describe('Giveaway Controller (e2e)', () => {
 
     // Verify winningInfo is also set
     expect(paymentStatus.winningInfo).toBeDefined();
+  });
+
+  it('should create Win entries for distributed giveaways', async () => {
+    // Setup: Create a giveaway creator with tokens
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
+      await createUser();
+
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    // Create a DistributedGiveaway without burn requirements
+    const distributedGiveaway = {
+      ...startBalanceGiveaway,
+      giveawayType: 'DistributedGiveaway',
+      requireBurnTokenToClaim: false,
+      tokenQuantity: '5',
+      maxWinners: '1',
+      uniqueKey: `giveaway-start-${new Date().getTime()}`,
+    };
+
+    const signedPayload = await giveawayCreatorSigner.sign(
+      'Start Giveaway',
+      distributedGiveaway,
+    );
+
+    const createRes = await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(201);
+
+    expect(createRes.body.success).toBe(true);
+    const giveawayId = createRes.body.giveaway._id;
+
+    // Create a user to sign up for the giveaway
+    const { profile: userProfile, signer: userSigner } = await createUser();
+
+    // User signs up for the giveaway
+    const signupData = {
+      giveawayId,
+      uniqueKey: `giveaway-signup-${new Date().getTime()}`,
+    };
+
+    const signedSignupPayload = await userSigner.sign('Signup', signupData);
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/signup')
+      .set('Content-Type', 'application/json')
+      .send(signedSignupPayload)
+      .expect(201);
+
+    // Force end the giveaway to trigger distribution
+    const ended = await endGiveaway(giveawayId);
+    expect(ended.acknowledged).toBe(true);
+
+    // Process the giveaway (triggers the payments)
+    await giveawayScheduler.handleCron();
+
+    // Verify the giveaway is now completed
+    await request(app.getHttpServer())
+      .get('/api/giveaway/all')
+      .set('Content-Type', 'application/json')
+      .expect(200)
+      .expect((res) => {
+        const giveaway = res.body.find((g) => g._id === giveawayId);
+        expect(giveaway).toBeDefined();
+        expect(giveaway.giveawayStatus).toBe(GiveawayStatus.Completed);
+      });
+
+    // Get the Win model and check if entries are created
+    const winModel = app.get(getModelToken('Win'));
+    const winEntries = await winModel
+      .find({
+        gcAddress: userProfile.galaChainAddress,
+        giveaway: giveawayId,
+      })
+      .exec();
+
+    // This should fail currently since Win entries are not created for distributed giveaways
+    // without burn requirements
+    expect(winEntries.length).toBe(1);
+
+    // Additional assertions that will fail since the Win entry doesn't exist
+    if (winEntries.length > 0) {
+      expect(winEntries[0].amountWon).toBe(distributedGiveaway.tokenQuantity);
+      expect(winEntries[0].claimed).toBe(true);
+    }
+  });
+
+  it('should create Win entries for distributed giveaways with burn requirements', async () => {
+    // Setup: Create a giveaway creator with tokens
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
+      await createUser();
+
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    // Create a DistributedGiveaway with burn requirements
+    const distributedGiveaway = {
+      ...startBalanceGiveaway,
+      giveawayType: 'DistributedGiveaway',
+      requireBurnTokenToClaim: true, // Require token burn
+      burnToken: GALA_TOKEN,
+      burnTokenQuantity: '1',
+      tokenQuantity: '5',
+      maxWinners: '1',
+      uniqueKey: `giveaway-start-${new Date().getTime()}`,
+    };
+
+    const signedPayload = await giveawayCreatorSigner.sign(
+      'Start Giveaway',
+      distributedGiveaway,
+    );
+
+    const createRes = await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(201);
+
+    expect(createRes.body.success).toBe(true);
+    const giveawayId = createRes.body.giveaway._id;
+
+    // Create a user to sign up for the giveaway
+    const { profile: userProfile, signer: userSigner } = await createUser();
+
+    // User signs up for the giveaway
+    const signupData = {
+      giveawayId,
+      uniqueKey: `giveaway-signup-${new Date().getTime()}`,
+    };
+
+    const signedSignupPayload = await userSigner.sign('Signup', signupData);
+
+    await request(app.getHttpServer())
+      .post('/api/giveaway/signup')
+      .set('Content-Type', 'application/json')
+      .send(signedSignupPayload)
+      .expect(201);
+
+    // Force end the giveaway to trigger distribution
+    const ended = await endGiveaway(giveawayId);
+    expect(ended.acknowledged).toBe(true);
+
+    // Process the giveaway (triggers the payments)
+    await giveawayScheduler.handleCron();
+
+    // Verify the giveaway is now completed
+    await request(app.getHttpServer())
+      .get('/api/giveaway/all')
+      .set('Content-Type', 'application/json')
+      .expect(200)
+      .expect((res) => {
+        const giveaway = res.body.find((g) => g._id === giveawayId);
+        expect(giveaway).toBeDefined();
+        expect(giveaway.giveawayStatus).toBe(GiveawayStatus.Completed);
+      });
+
+    // Get the Win model and check if entries are created
+    const winModel = app.get(getModelToken('Win'));
+    const winEntries = await winModel
+      .find({
+        gcAddress: userProfile.galaChainAddress,
+        giveaway: giveawayId,
+      })
+      .exec();
+
+    // This should pass since Win entries ARE created for distributed giveaways
+    // with burn requirements
+    expect(winEntries.length).toBe(1);
+
+    // Additional assertions
+    if (winEntries.length > 0) {
+      expect(winEntries[0].amountWon).toBe(distributedGiveaway.tokenQuantity);
+      // Should not be claimed yet as user needs to burn tokens
+      expect(winEntries[0].claimed).toBeFalsy();
+    }
   });
 
   afterEach(async () => {

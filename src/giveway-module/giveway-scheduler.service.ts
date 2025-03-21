@@ -14,6 +14,7 @@ import { GiveawayTokenType } from '../dtos/giveaway.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PaymentStatusDocument } from '../schemas/PaymentStatusSchema';
+import { WinDocument } from '../schemas/ClaimableWin.schema';
 
 @Injectable()
 export class GivewayScheduler {
@@ -24,6 +25,8 @@ export class GivewayScheduler {
     @Inject(APP_SECRETS) private secrets: Record<string, any>,
     @InjectModel('PaymentStatus')
     private readonly paymentStatusModel: Model<PaymentStatusDocument>,
+    @InjectModel('Win')
+    private readonly winModel: Model<WinDocument>,
   ) {}
 
   @Cron('0 * * * * *') // This cron expression runs every minute on the 0th second
@@ -95,6 +98,15 @@ export class GivewayScheduler {
 
               // Create payment status records for each winner
               for (const winner of winners) {
+                // Create win entry for distributed giveaways without burn requirements
+                const winEntry = new this.winModel({
+                  giveaway: giveaway.id,
+                  amountWon: winner.winAmount,
+                  gcAddress: winner.gcAddress,
+                  claimed: true, // Mark as claimed since no burn required and tokens already sent
+                });
+                await winEntry.save();
+
                 const paymentStatus = new this.paymentStatusModel({
                   giveaway: giveaway.id,
                   gcAddress: winner.gcAddress,
@@ -164,6 +176,18 @@ export class GivewayScheduler {
                 giveaway.winners[index].error = transferResult.error;
               } else {
                 giveaway.winners[index].completed = true;
+
+                // Create Win entry for distributed giveaways without burn requirements
+                if (transferResult.success) {
+                  const winEntry = new this.winModel({
+                    giveaway: giveaway.id,
+                    amountWon: giveaway.winners[index].winAmount,
+                    gcAddress: owner,
+                    claimed: true, // Mark as claimed since no burn required and tokens already sent
+                  });
+                  await winEntry.save();
+                }
+
                 // Create payment status record for successful transfer
                 const paymentStatus = new this.paymentStatusModel({
                   giveaway: giveaway.id,
