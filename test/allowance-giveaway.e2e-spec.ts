@@ -89,7 +89,7 @@ describe('Giveaway Controller (e2e)', () => {
       type: 'none',
     },
     maxWinners: '1',
-    tokenQuantity: '1',
+    winPerUser: '1',
     prefix: '\u0019Ethereum Signed Message:\n346',
   };
 
@@ -391,7 +391,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startAllowanceGiveaway,
-      tokenQuantity: 2,
+      winPerUser: 2,
     });
 
     await request(app.getHttpServer())

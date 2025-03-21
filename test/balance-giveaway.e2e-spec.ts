@@ -94,7 +94,7 @@ describe('Giveaway Controller (e2e)', () => {
       type: 'none',
     },
     maxWinners: '1',
-    tokenQuantity: '1',
+    winPerUser: '1',
     prefix: '\u0019Ethereum Signed Message:\n346',
   };
 
@@ -138,7 +138,7 @@ describe('Giveaway Controller (e2e)', () => {
     const signedPayload = await signer.sign('Start Giveaway', {
       ...startBalanceGiveaway,
       maxWinners: 10,
-      tokenQuantity: 5,
+      winPerUser: 5,
       giveawayToken: {
         additionalKey: 'none',
         category: 'Unit',
@@ -306,7 +306,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      tokenQuantity: 2,
+      winPerUser: 2,
     });
 
     await request(app.getHttpServer())
@@ -320,7 +320,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      tokenQuantity: 1,
+      winPerUser: 1,
     });
 
     await request(app.getHttpServer())
@@ -345,7 +345,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      tokenQuantity: 10,
+      winPerUser: 10,
       maxWinners: 10,
     });
 
@@ -360,7 +360,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      tokenQuantity: 2,
+      winPerUser: 2,
       maxWinners: 2,
     });
 
@@ -385,7 +385,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      tokenQuantity: 10,
+      winPerUser: 10,
       maxWinners: 10,
     });
 
@@ -400,7 +400,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      tokenQuantity: 3,
+      winPerUser: 3,
       maxWinners: 3,
     });
 
@@ -437,7 +437,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      tokenQuantity: 2,
+      winPerUser: 2,
     });
 
     await request(app.getHttpServer())
@@ -451,7 +451,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      tokenQuantity: 2,
+      winPerUser: 2,
       giveawayToken: { ...GALA_TOKEN, collection: 'GALA2' }, //electric boogaloo
     });
 
@@ -483,7 +483,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      tokenQuantity: 2,
+      winPerUser: 2,
     });
 
     await request(app.getHttpServer())
@@ -497,7 +497,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      tokenQuantity: 2,
+      winPerUser: 2,
       giveawayToken: { ...GALA_TOKEN, collection: 'GALA2' }, //electric boogaloo
     });
 
@@ -1574,7 +1574,7 @@ describe('Giveaway Controller (e2e)', () => {
     const distributedGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'DistributedGiveaway',
-      tokenQuantity: '5',
+      winPerUser: '5',
       maxWinners: '1',
       uniqueKey: `giveaway-start-${new Date().getTime()}`,
     };
@@ -1654,7 +1654,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     // Verify amount is set correctly
     expect(winEntry.amountWon).toBeDefined();
-    expect(winEntry.amountWon).toBe(distributedGiveaway.tokenQuantity);
+    expect(winEntry.amountWon).toBe(distributedGiveaway.winPerUser);
 
     // Verify winningInfo is also set
     expect(winEntry.winningInfo).toBeDefined();
@@ -1676,7 +1676,7 @@ describe('Giveaway Controller (e2e)', () => {
       ...startBalanceGiveaway,
       giveawayType: 'DistributedGiveaway',
       requireBurnTokenToClaim: false,
-      tokenQuantity: '5',
+      winPerUser: '5',
       maxWinners: '1',
       uniqueKey: `giveaway-start-${new Date().getTime()}`,
     };
@@ -1745,7 +1745,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     // Additional assertions that will fail since the Win entry doesn't exist
     if (winEntries.length > 0) {
-      expect(winEntries[0].amountWon).toBe(distributedGiveaway.tokenQuantity);
+      expect(winEntries[0].amountWon).toBe(distributedGiveaway.winPerUser);
       expect(winEntries[0].claimed).toBe(true);
     }
   });
@@ -1768,7 +1768,7 @@ describe('Giveaway Controller (e2e)', () => {
       requireBurnTokenToClaim: true, // Require token burn
       burnToken: GALA_TOKEN,
       burnTokenQuantity: '1',
-      tokenQuantity: '5',
+      winPerUser: '5',
       maxWinners: '1',
       uniqueKey: `giveaway-start-${new Date().getTime()}`,
     };
@@ -1837,7 +1837,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     // Additional assertions
     if (winEntries.length > 0) {
-      expect(winEntries[0].amountWon).toBe(distributedGiveaway.tokenQuantity);
+      expect(winEntries[0].amountWon).toBe(distributedGiveaway.winPerUser);
       // Should not be claimed yet as user needs to burn tokens
       expect(winEntries[0].claimed).toBeFalsy();
     }

@@ -66,7 +66,7 @@ describe('GiveawayService', () => {
     giveawayService = module.get<GiveawayService>(GiveawayService);
   });
 
-  it('should distribute all tokens when tokenQuantity is greater than 1000', () => {
+  it('should distribute all tokens when winPerUser is greater than 1000', () => {
     const giveaway: any = {
       endDateTime: new Date(),
       giveawayToken: {
@@ -75,11 +75,12 @@ describe('GiveawayService', () => {
         category: 'testCategory',
         additionalKey: 'testKey',
       },
-      tokenQuantity: '5000',
+      winPerUser: '5000',
       winners: [],
       usersSignedUp: ['user1', 'user2', 'user3', 'user4', 'user5'],
       distributed: false,
       creator: new Types.ObjectId(),
+      maxWinners: 5,
     };
 
     const winners = giveawayService.determineWinners(giveaway);
@@ -90,7 +91,9 @@ describe('GiveawayService', () => {
     );
 
     expect(
-      totalDistributedTokens.isEqualTo(new BigNumber(giveaway.tokenQuantity)),
+      totalDistributedTokens.isEqualTo(
+        new BigNumber(giveaway.winPerUser).multipliedBy(giveaway.maxWinners),
+      ),
     ).toBe(true);
 
     // Ensure isDistributed is false
@@ -106,11 +109,12 @@ describe('GiveawayService', () => {
         category: 'testCategory',
         additionalKey: 'testKey',
       },
-      tokenQuantity: '10',
+      winPerUser: '10',
       winners: [],
       usersSignedUp: [], // No users signed up
       distributed: false,
       creator: new Types.ObjectId(),
+      maxWinners: 5,
     };
 
     const winners = giveawayService.determineWinners(giveaway);
@@ -126,11 +130,12 @@ describe('GiveawayService', () => {
         category: 'testCategory',
         additionalKey: 'testKey',
       },
-      tokenQuantity: '100',
+      winPerUser: '100',
       winners: [],
       usersSignedUp: ['user1'], // Only one user signed up
       distributed: false,
       creator: new Types.ObjectId(),
+      maxWinners: 5,
     };
 
     const winners = giveawayService.determineWinners(giveaway);
@@ -138,15 +143,21 @@ describe('GiveawayService', () => {
     // Ensure the only user receives all tokens
     expect(winners.length).toBe(1);
     expect(winners[0].gcAddress).toBe('user1');
-    expect(winners[0].winAmount).toBe(giveaway.tokenQuantity);
+    expect(winners[0].winAmount).toBe(
+      new BigNumber(giveaway.winPerUser)
+        .multipliedBy(giveaway.maxWinners)
+        .toString(),
+    );
 
-    // Validate that the total tokens distributed equals the tokenQuantity
+    // Validate that the total tokens distributed equals the winPerUser
     const totalDistributedTokens = winners.reduce(
       (sum, winner) => sum.plus(new BigNumber(winner.winAmount)),
       new BigNumber(0),
     );
     expect(
-      totalDistributedTokens.isEqualTo(new BigNumber(giveaway.tokenQuantity)),
+      totalDistributedTokens.isEqualTo(
+        new BigNumber(giveaway.winPerUser).multipliedBy(giveaway.maxWinners),
+      ),
     ).toBe(true);
   });
   it('should distribute tokens across multiple users with controlled randomness', () => {
@@ -158,14 +169,15 @@ describe('GiveawayService', () => {
         category: 'testCategory',
         additionalKey: 'testKey',
       },
-      tokenQuantity: '100',
+      winPerUser: '100',
       winners: [],
       usersSignedUp: ['user1', 'user2', 'user3', 'user4'],
       distributed: false,
       creator: new Types.ObjectId(),
+      maxWinners: 4,
     };
 
-    const totalRandomCalls = giveaway.tokenQuantity;
+    const totalRandomCalls = giveaway.winPerUser;
     const mockRandomValues = Array.from(
       { length: totalRandomCalls },
       (_, i) => {
@@ -180,10 +192,10 @@ describe('GiveawayService', () => {
     const winners = giveawayService.determineWinners(giveaway);
 
     const expectedWinCounts = {
-      user1: '25',
-      user2: '25',
-      user3: '25',
-      user4: '25',
+      user1: '100',
+      user2: '100',
+      user3: '100',
+      user4: '100',
     };
 
     winners.forEach((winner) => {
@@ -195,12 +207,16 @@ describe('GiveawayService', () => {
       (sum, winner) => sum.plus(new BigNumber(winner.winAmount)),
       new BigNumber(0),
     );
-    expect(totalDistributedTokens.isEqualTo(giveaway.tokenQuantity)).toBe(true);
+    expect(
+      totalDistributedTokens.isEqualTo(
+        new BigNumber(giveaway.winPerUser).multipliedBy(giveaway.maxWinners),
+      ),
+    ).toBe(true);
 
     jest.restoreAllMocks();
   });
 
-  it('should distribute tokens across multiple users with controlled randomness and high tokenQuantity', () => {
+  it('should distribute tokens across multiple users with controlled randomness and high winPerUser', () => {
     const extremelyLargeNumber = new BigNumber('1e100').plus(new BigNumber(2)); // Extremely large number, beyond JS Number, plus one to ensure edge case is handled
 
     const giveaway: any = {
@@ -211,11 +227,12 @@ describe('GiveawayService', () => {
         category: 'testCategory',
         additionalKey: 'testKey',
       },
-      tokenQuantity: extremelyLargeNumber.toString(),
+      winPerUser: extremelyLargeNumber.toString(),
       winners: [],
       usersSignedUp: ['user1', 'user2', 'user3', 'user4'],
       distributed: false,
       creator: new Types.ObjectId(),
+      maxWinners: 4,
     };
 
     let callIndex = 0;
@@ -232,10 +249,10 @@ describe('GiveawayService', () => {
 
     // Ensure that the winners were selected as per the mock random values
     const expectedWinCounts = {
-      user1: new BigNumber('2.5e+99').plus(new BigNumber(2)).toString(),
-      user2: '2.5e+99',
-      user3: '2.5e+99',
-      user4: '2.5e+99',
+      user1: new BigNumber('1.00e+100').plus(new BigNumber(2)).toString(),
+      user2: new BigNumber('1.00e+100').plus(new BigNumber(2)).toString(),
+      user3: new BigNumber('1.00e+100').plus(new BigNumber(2)).toString(),
+      user4: new BigNumber('1.00e+100').plus(new BigNumber(2)).toString(),
     };
 
     expect(winners.length).toBe(4);
@@ -249,13 +266,15 @@ describe('GiveawayService', () => {
       new BigNumber(0),
     );
     expect(
-      totalDistributedTokens.isEqualTo(new BigNumber(giveaway.tokenQuantity)),
+      totalDistributedTokens.isEqualTo(
+        new BigNumber(giveaway.winPerUser).multipliedBy(giveaway.maxWinners),
+      ),
     ).toBe(true);
 
     jest.restoreAllMocks();
   });
 
-  it('should distribute tokens across a single user with controlled randomness and high tokenQuantity', () => {
+  it('should distribute tokens across a single user with controlled randomness and high winPerUser', () => {
     const extremelyLargeNumber = new BigNumber('1e100').plus(new BigNumber(2)); // Extremely large number, beyond JS Number, plus one to ensure edge case is handled
 
     const giveaway: any = {
@@ -266,7 +285,7 @@ describe('GiveawayService', () => {
         category: 'testCategory',
         additionalKey: 'testKey',
       },
-      tokenQuantity: extremelyLargeNumber.toString(),
+      winPerUser: extremelyLargeNumber.toString(),
       winners: [],
       maxWinners: 1,
       usersSignedUp: ['user1', 'user2', 'user3', 'user4'],
@@ -303,7 +322,7 @@ describe('GiveawayService', () => {
       new BigNumber(0),
     );
     expect(
-      totalDistributedTokens.isEqualTo(new BigNumber(giveaway.tokenQuantity)),
+      totalDistributedTokens.isEqualTo(new BigNumber(giveaway.winPerUser)),
     ).toBe(true);
 
     winners = giveawayService.determineWinners(giveaway);

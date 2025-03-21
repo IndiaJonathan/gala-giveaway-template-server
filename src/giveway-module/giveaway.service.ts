@@ -162,7 +162,7 @@ export class GiveawayService {
           endDateTime: filteredGiveaway.endDateTime,
           giveawayType: filteredGiveaway.giveawayType,
           giveawayToken: filteredGiveaway.giveawayToken,
-          tokenQuantity: filteredGiveaway.tokenQuantity,
+          winPerUser: filteredGiveaway.winPerUser,
           creator: filteredGiveaway.creator,
           burnToken: filteredGiveaway.burnToken,
           burnTokenQuantity: filteredGiveaway.burnTokenQuantity,
@@ -317,6 +317,10 @@ export class GiveawayService {
     const usersSignedUp = giveaway.usersSignedUp;
     const numberOfUsers = usersSignedUp.length;
     const winnersMap: { [userId: string]: BigNumber } = {};
+
+    if (!giveaway.maxWinners) {
+      throw new BadRequestException('Max winners not set');
+    }
     const iterations = Math.min(
       MAX_WINNERS,
       giveaway.maxWinners || MAX_WINNERS,
@@ -326,7 +330,9 @@ export class GiveawayService {
       return [];
     }
 
-    let remainingTokens = new BigNumber(giveaway.tokenQuantity);
+    let remainingTokens = new BigNumber(giveaway.winPerUser).multipliedBy(
+      giveaway.maxWinners,
+    );
 
     let minWinPerIteration = new BigNumber(1);
     if (remainingTokens.gt(iterations)) {
@@ -588,7 +594,7 @@ export class GiveawayService {
           giveaway.maxWinners,
         );
       case 'DistributedGiveaway':
-        return BigNumber(giveaway.tokenQuantity).multipliedBy(
+        return BigNumber(giveaway.winPerUser).multipliedBy(
           BigNumber(giveaway.maxWinners),
         );
     }
@@ -721,7 +727,7 @@ export class GiveawayService {
         switch (giveaway.giveawayType) {
           case 'DistributedGiveaway':
             totalQuantity = BigNumber(totalQuantity).minus(
-              new BigNumber(giveaway.tokenQuantity).multipliedBy(
+              new BigNumber(giveaway.winPerUser).multipliedBy(
                 giveaway.maxWinners,
               ),
             );
@@ -765,9 +771,7 @@ export class GiveawayService {
     unDistributedGiveaways.forEach((giveaway) => {
       switch (giveaway.giveawayType) {
         case 'DistributedGiveaway':
-          totalQuantity = BigNumber(totalQuantity).minus(
-            giveaway.tokenQuantity,
-          );
+          totalQuantity = BigNumber(totalQuantity).minus(giveaway.winPerUser);
           break;
         case 'FirstComeFirstServe':
           totalQuantity = BigNumber(totalQuantity).minus(giveaway.maxWinners);

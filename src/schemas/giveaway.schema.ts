@@ -22,11 +22,11 @@ export interface GiveawayDocument extends Document {
   endDateTime: Date;
   giveawayType: 'FirstComeFirstServe' | 'DistributedGiveaway';
   giveawayToken: TokenClassKeyProperties;
-  tokenQuantity?: string; // Optional for FCFS
+  winPerUser?: string; // Only for DistributedGiveaway
   winners: Winner[];
-  claimPerUser?: number; // Required for FCFS
+  claimPerUser?: number; // Only for FCFS
   maxWinners: number;
-  usersSignedUp?: string[]; //Required for distributed giveaway
+  usersSignedUp?: string[]; //Only for distributed giveaway
   giveawayStatus: GiveawayStatus;
   creator: ObjectId;
   telegramAuthRequired: boolean;
@@ -61,7 +61,7 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
   giveawayErrors: { type: [String], default: [] },
 
   // For Random Giveaway
-  tokenQuantity: {
+  winPerUser: {
     type: String,
     required: function (this: GiveawayDocument) {
       return this.giveawayType === 'DistributedGiveaway';
