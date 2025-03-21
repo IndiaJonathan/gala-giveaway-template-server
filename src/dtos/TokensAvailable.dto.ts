@@ -4,7 +4,7 @@ import { Type } from 'class-transformer';
 import { GiveawayTokenType } from './giveaway.dto';
 import { TokenInstanceKeyDto } from './TokenInstanceKey.dto';
 
-export class TokensAvailableDto extends TokenInstanceKeyDto {
+export class TokensAvailableDto {
   @ValidateNested()
   @Type(() => TokenInstanceKeyDto)
   tokenInstanceKey: TokenInstanceKeyDto;

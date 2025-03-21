@@ -291,7 +291,7 @@ export class GiveawayController {
 
     const galaBalances = await this.tokenService.getBalancesForToken(
       userInfo.giveawayWalletAddress,
-      tokenDto.tokenInstanceKey,
+      GALA_TOKEN,
     );
 
     //todo: account for locks
@@ -363,6 +363,50 @@ export class GiveawayController {
         success: false,
         message: 'Failed to retrieve user wins',
         error,
+      });
+    }
+  }
+
+  @Post('required-gas/:gcAddress')
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async getRequiredGas(
+    @Param('gcAddress') gcAddress: string,
+    @Body() giveawayDto: GiveawayDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const account = await this.profileService.findProfileByGC(gcAddress);
+
+      if (!account) {
+        throw new NotFoundException(
+          `User with GC address ${gcAddress} not found`,
+        );
+      }
+
+      //For previous giveaways
+      const escrowGas =
+        await this.giveawayService.getTotalGalaFeesRequiredPlusEscrow(
+          account.id,
+        );
+
+      //For the new giveaway
+      const gasForGiveaway =
+        this.giveawayService.getRequiredGalaGasFeeForGiveaway(giveawayDto);
+
+      const requiredGas = escrowGas.plus(gasForGiveaway);
+
+      res.status(HttpStatus.OK).json({
+        success: true,
+        requiredGas: requiredGas.toString(),
+        escrowGas: escrowGas.toString(),
+        gasForGiveaway: gasForGiveaway.toString(),
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: 'Failed to calculate required gas fees',
+        error: error.message || error,
       });
     }
   }
