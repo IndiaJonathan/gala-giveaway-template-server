@@ -57,7 +57,23 @@ export class GivewayScheduler {
         console.log(`Determining winners...`);
         winners = this.giveawayService.determineWinners(giveaway);
         giveaway.winners = winners;
-        console.log(`Determined ${giveaway.winners} winners`);
+        console.log(`Determined ${giveaway.winners.length} winners`);
+
+        // Create initial win entries for each winner right after determining winners
+        // But skip for giveaways that require burn tokens to claim, as those will be created later
+        if (winners.length > 0 && !giveaway.requireBurnTokenToClaim) {
+          for (const winner of winners) {
+            const winEntry = new this.winModel({
+              giveaway: giveaway.id,
+              amountWon: winner.winAmount,
+              gcAddress: winner.gcAddress,
+              claimed: false, // Initially set to false
+              giveawayType: giveaway.giveawayType,
+              // No winningInfo or paymentSent yet
+            });
+            await winEntry.save();
+          }
+        }
       }
       if (winners.length === 0) {
         giveaway.giveawayStatus = GiveawayStatus.Cancelled;
@@ -93,18 +109,19 @@ export class GivewayScheduler {
               giveaway.giveawayStatus = GiveawayStatus.Completed;
               console.log(`Giveway done!`);
 
-              // Create win entries for each winner
+              // Update existing win entries for each winner
               for (const winner of winners) {
-                const winEntry = new this.winModel({
+                const winEntry = await this.winModel.findOne({
                   giveaway: giveaway.id,
-                  amountWon: winner.winAmount,
                   gcAddress: winner.gcAddress,
-                  claimed: true, // Mark as claimed since no burn required and tokens already sent
-                  winningInfo: JSON.stringify(mintResult),
-                  paymentSent: new Date(),
-                  giveawayType: giveaway.giveawayType,
                 });
-                await winEntry.save();
+
+                if (winEntry) {
+                  winEntry.claimed = true;
+                  winEntry.winningInfo = JSON.stringify(mintResult);
+                  winEntry.paymentSent = new Date();
+                  await winEntry.save();
+                }
               }
             } else {
               giveaway.giveawayErrors.push((mintResult as any).message);
@@ -167,18 +184,21 @@ export class GivewayScheduler {
               } else {
                 giveaway.winners[index].completed = true;
 
-                // Create Win entry for distributed giveaways without burn requirements
+                // Update existing win entry after successful transfer
                 if (transferResult.success) {
-                  const winEntry = new this.winModel({
+                  const winEntry = await this.winModel.findOne({
                     giveaway: giveaway.id,
-                    amountWon: giveaway.winners[index].winAmount,
                     gcAddress: owner,
-                    claimed: true, // Mark as claimed since no burn required and tokens already sent
-                    winningInfo: JSON.stringify(transferResult.result),
-                    paymentSent: new Date(),
-                    giveawayType: giveaway.giveawayType,
                   });
-                  await winEntry.save();
+
+                  if (winEntry) {
+                    winEntry.claimed = true;
+                    winEntry.winningInfo = JSON.stringify(
+                      transferResult.result,
+                    );
+                    winEntry.paymentSent = new Date();
+                    await winEntry.save();
+                  }
                 }
               }
             }

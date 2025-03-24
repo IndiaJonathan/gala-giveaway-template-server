@@ -1739,11 +1739,8 @@ describe('Giveaway Controller (e2e)', () => {
       })
       .exec();
 
-    // This should fail currently since Win entries are not created for distributed giveaways
-    // without burn requirements
     expect(winEntries.length).toBe(1);
 
-    // Additional assertions that will fail since the Win entry doesn't exist
     if (winEntries.length > 0) {
       expect(winEntries[0].amountWon).toBe(distributedGiveaway.winPerUser);
       expect(winEntries[0].claimed).toBe(true);
@@ -1760,6 +1757,8 @@ describe('Giveaway Controller (e2e)', () => {
       GALA_TOKEN,
       50,
     );
+
+    const winModel = app.get(getModelToken('Win'));
 
     // Create a DistributedGiveaway with burn requirements
     const distributedGiveaway = {
@@ -1811,6 +1810,15 @@ describe('Giveaway Controller (e2e)', () => {
     // Process the giveaway (triggers the payments)
     await giveawayScheduler.handleCron();
 
+    const winEntries2 = await winModel
+      .find({
+        gcAddress: userProfile.galaChainAddress,
+        giveaway: giveawayId,
+      })
+      .exec();
+
+    expect(winEntries2.length).toBe(1);
+
     // Verify the giveaway is now completed
     await request(app.getHttpServer())
       .get('/api/giveaway/all')
@@ -1823,7 +1831,6 @@ describe('Giveaway Controller (e2e)', () => {
       });
 
     // Get the Win model and check if entries are created
-    const winModel = app.get(getModelToken('Win'));
     const winEntries = await winModel
       .find({
         gcAddress: userProfile.galaChainAddress,
@@ -1831,8 +1838,6 @@ describe('Giveaway Controller (e2e)', () => {
       })
       .exec();
 
-    // This should pass since Win entries ARE created for distributed giveaways
-    // with burn requirements
     expect(winEntries.length).toBe(1);
 
     // Additional assertions
