@@ -153,7 +153,6 @@ describe('Profile related functions', () => {
       // Verify the method was called with the correct data
       expect(checkAuthSpy).toHaveBeenCalledWith(snakeCaseData, botToken);
     });
-
   });
 
   afterEach(async () => {

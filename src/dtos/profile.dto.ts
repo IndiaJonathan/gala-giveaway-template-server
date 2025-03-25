@@ -3,15 +3,6 @@ import { SignedPayloadBaseDto } from './SignedPayloadBase.dto';
 import { ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class ProfileDto {
-  ethAddress: string;
-  galaChainAddress: string;
-  telegramId?: string;
-  firstName?: string;
-  lastName?: string;
-  id?: string;
-}
-
 import { IsInt, IsBoolean, Min } from 'class-validator';
 
 export class TelegramUserDto {
@@ -24,10 +15,12 @@ export class TelegramUserDto {
   is_bot?: boolean;
 
   @IsString()
-  first_name: string;
+  @IsOptional()
+  first_name?: string;
 
   @IsString()
-  username: string;
+  @IsOptional()
+  username?: string;
 
   @IsOptional()
   @IsString()

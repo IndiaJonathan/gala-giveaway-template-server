@@ -30,8 +30,10 @@ export const removePrefixes = (prefixedString: string) => {
     .replace('0x', '');
 };
 
-export function validateSignature<T extends { signature: string }>(object: T) {
-  const publicKey = signatures.recoverPublicKey(object.signature, object, '');
+export function validateSignature<
+  T extends { signature: string; prefix?: string },
+>(object: T) {
+  const publicKey = recoverPublicKeyFromSignature(object);
   const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
   return gc_address;
 }

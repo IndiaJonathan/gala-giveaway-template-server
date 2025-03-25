@@ -58,7 +58,7 @@ export class ProfileController {
   }
 
   @Post('link-accounts')
-  async linkAccounts(@Body() linkDto: LinkDto) {
+  async linkAccounts(@Body() linkDto: any) {
     const botToken = await this.secrets['TELEGRAM_BOT_TOKEN'];
 
     if (!botToken) {
@@ -76,6 +76,7 @@ export class ProfileController {
         "GalaChain address and signature don't match",
       );
     }
+
 
     // Validate Telegram authorization
     const isTelegramValid = this.profileService.checkTelegramAuthorization(
