@@ -13,7 +13,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
-import { LinkDto } from '../dtos/profile.dto';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import { GiveawayService } from '../giveway-module/giveaway.service';
 import { GalachainApi } from '../web3-module/galachain.api';
@@ -76,7 +75,6 @@ export class ProfileController {
         "GalaChain address and signature don't match",
       );
     }
-
 
     // Validate Telegram authorization
     const isTelegramValid = this.profileService.checkTelegramAuthorization(
