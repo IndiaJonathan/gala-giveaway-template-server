@@ -21,7 +21,7 @@ export class TelegramUserDto {
 
   @IsBoolean()
   @IsOptional()
-  is_bot: boolean;
+  is_bot?: boolean;
 
   @IsString()
   first_name: string;

@@ -78,10 +78,18 @@ describe('Profile related functions', () => {
       // Create test LinkDto with the proper camelCase properties
       const linkDto: LinkDto = {
         signature: 'test-signature',
+        prefix: 'eth',
+        domain: { name: 'ETH' },
+        types: ['eth'],
         'GalaChain Address': mockGcAddress,
-        id: '12345',
-        firstName: 'John',
-        lastName: 'Doe',
+        'Telegram User': {
+          id: 12345,
+          first_name: 'John',
+          last_name: 'Doe',
+          auth_date: new Date().getTime(),
+          hash: 'fooo',
+          username: 'john_doe',
+        },
       };
 
       // Call the linkAccounts method
@@ -89,7 +97,9 @@ describe('Profile related functions', () => {
 
       // Verify that save was called on the profile with the correct data
       expect(mockProfile.save).toHaveBeenCalled();
-      expect(mockProfile.telegramId).toBe(linkDto.id);
+      expect(mockProfile.telegramId).toBe(
+        linkDto['Telegram User'].id.toString(),
+      );
       expect(mockProfile.firstName).toBe('John');
       expect(mockProfile.lastName).toBe('Doe');
     });
@@ -144,61 +154,6 @@ describe('Profile related functions', () => {
       expect(checkAuthSpy).toHaveBeenCalledWith(snakeCaseData, botToken);
     });
 
-    it('should correctly transform snake_case to camelCase when saving profile', async () => {
-      // Mock the validateSignature function to return a valid address
-      const mockGcAddress = 'eth|0x1234567890abcdef1234567890abcdef12345678';
-      jest
-        .spyOn(web3wallet, 'validateSignature')
-        .mockReturnValue(mockGcAddress);
-
-      // Mock findProfileByGC to return a profile object
-      const mockProfile = {
-        _id: 'test-id',
-        galaChainAddress: mockGcAddress,
-        ethAddress: '0x1234567890abcdef1234567890abcdef12345678',
-        telegramId: undefined,
-        firstName: undefined,
-        lastName: undefined,
-        save: jest.fn().mockResolvedValue(true),
-      } as unknown as ProfileDocument;
-
-      jest
-        .spyOn(profileService, 'findProfileByGC')
-        .mockResolvedValue(mockProfile);
-
-      // Mock the checkTelegramAuthorization to return true
-      jest
-        .spyOn(profileService, 'checkTelegramAuthorization')
-        .mockReturnValue(true);
-
-      // Create test LinkDto with snake_case properties (simulating Telegram data)
-      const linkDtoSnakeCase = {
-        signature: 'test-signature',
-        'GalaChain Address': mockGcAddress,
-        id: '12345',
-        first_name: 'John',
-        last_name: 'Doe',
-      };
-
-      // We need to cast this to LinkDto despite the different property names
-      // to simulate what might happen if Telegram sends snake_case but our DTO expects camelCase
-      // In a real scenario, we'd want to test if NestJS correctly transforms this
-      // Add a manual transformation for the test
-      const transformedDto = {
-        ...linkDtoSnakeCase,
-        firstName: linkDtoSnakeCase.first_name,
-        lastName: linkDtoSnakeCase.last_name,
-      } as unknown as LinkDto;
-
-      // Call the linkAccounts method with the transformed DTO
-      await profileController.linkAccounts(transformedDto);
-
-      // Verify that save was called on the profile with the correct data
-      expect(mockProfile.save).toHaveBeenCalled();
-      expect(mockProfile.telegramId).toBe(transformedDto.id);
-      expect(mockProfile.firstName).toBe('John');
-      expect(mockProfile.lastName).toBe('Doe');
-    });
   });
 
   afterEach(async () => {
