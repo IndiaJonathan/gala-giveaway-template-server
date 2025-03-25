@@ -79,7 +79,7 @@ export class ProfileController {
 
     // Validate Telegram authorization
     const isTelegramValid = this.profileService.checkTelegramAuthorization(
-      linkDto,
+      linkDto['Telegram User'],
       botToken,
     );
 
@@ -88,9 +88,9 @@ export class ProfileController {
       const profile = await this.profileService.findProfileByGC(
         linkDto['GalaChain Address'],
       );
-      profile.telegramId = linkDto.id;
-      profile.firstName = linkDto.firstName;
-      profile.lastName = linkDto.lastName;
+      profile.telegramId = linkDto['Telegram User'].id.toString();
+      profile.firstName = linkDto['Telegram User'].first_name;
+      profile.lastName = linkDto['Telegram User'].last_name;
       try {
         await profile.save();
       } catch (error) {

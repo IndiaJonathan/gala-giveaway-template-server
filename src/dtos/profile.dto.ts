@@ -1,4 +1,7 @@
 import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { SignedPayloadBaseDto } from './SignedPayloadBase.dto';
+import { ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class ProfileDto {
   ethAddress: string;
@@ -9,7 +12,38 @@ export class ProfileDto {
   id?: string;
 }
 
-export class LinkDto {
+import { IsInt, IsBoolean, Min } from 'class-validator';
+
+export class TelegramUserDto {
+  @IsInt()
+  @Min(0)
+  id: number;
+
+  @IsBoolean()
+  @IsOptional()
+  is_bot: boolean;
+
+  @IsString()
+  first_name: string;
+
+  @IsString()
+  username: string;
+
+  @IsOptional()
+  @IsString()
+  last_name?: string;
+
+  @IsInt()
+  @IsNotEmpty()
+  @Min(0)
+  auth_date: number;
+
+  @IsString()
+  @IsNotEmpty()
+  hash: string;
+}
+
+export class LinkDto extends SignedPayloadBaseDto {
   @IsString()
   @IsNotEmpty()
   signature: string;
@@ -18,15 +52,8 @@ export class LinkDto {
   @IsNotEmpty()
   'GalaChain Address': string;
 
-  @IsString()
-  @IsOptional()
-  id: string;
-
-  @IsString()
+  @ValidateNested()
+  @Type(() => TelegramUserDto)
   @IsNotEmpty()
-  firstName: string;
-
-  @IsString()
-  @IsOptional()
-  lastName: string;
+  'Telegram User': TelegramUserDto;
 }

@@ -29,10 +29,12 @@ export class ProfileService {
     @Inject(GalachainApi) private galaChainApi: GalachainApi,
   ) {}
 
-  // Method to check Telegram authorization using HMAC
   public checkTelegramAuthorization(authData: any, botToken: string): boolean {
     const checkHash = authData.hash;
-    if (!checkHash) return false;
+    if (!checkHash) {
+      console.warn('[TelegramAuth] Missing hash in auth data.');
+      return false;
+    }
 
     // Filter out unnecessary fields from authData
     const filteredAuthData = omit(authData, [
@@ -52,13 +54,15 @@ export class ProfileService {
 
     // Generate the HMAC to verify the hash
     const secretKey = crypto.createHash('sha256').update(botToken).digest();
+
     const hmac = crypto
       .createHmac('sha256', secretKey)
       .update(dataCheckString)
       .digest('hex');
 
-    // Return whether the HMAC matches the checkHash
-    return hmac === checkHash;
+    const isValid = hmac === checkHash;
+
+    return isValid;
   }
 
   // Create a new profile
