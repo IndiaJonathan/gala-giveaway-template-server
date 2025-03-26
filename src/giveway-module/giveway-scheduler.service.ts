@@ -42,8 +42,9 @@ export class GivewayScheduler {
         giveaway.creator,
       );
       if (!creatorProfile) {
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string
         console.error(
-          `Creator profile not found for giveaway: ${giveaway._id.toString()}`,
+          `Creator profile not found for giveaway: ${giveaway._id as any}`,
         );
         await handleGiveawayError(giveaway, 'Creator profile not found');
         continue;
@@ -283,8 +284,9 @@ async function handleGiveawayError(
 
   if (giveaway.giveawayErrors.length > 5) {
     giveaway.giveawayStatus = GiveawayStatus.Errored;
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
     console.error(
-      `Giveaway: ${giveaway._id.toString()} has errored out after ${giveaway.giveawayErrors.length} errors!!!`,
+      `Giveaway: ${giveaway._id as any} has errored out after ${giveaway.giveawayErrors.length} errors!!!`,
     );
   }
 

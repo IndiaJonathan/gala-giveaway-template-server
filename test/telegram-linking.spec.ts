@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 import { Test } from '@nestjs/testing';
 import { INestApplication, Provider } from '@nestjs/common';
 import { MongoMemoryServer } from 'mongodb-memory-server';
@@ -63,6 +64,7 @@ describe('Telegram Linking Integration Tests', () => {
     // Mock the findProfileByGC method to return our mock profile
     jest
       .spyOn(profileService, 'findProfileByGC')
+      // @ts-ignore
       .mockResolvedValue(mockProfile);
 
     // Mock the checkTelegramAuthorization method to return true
@@ -94,6 +96,7 @@ describe('Telegram Linking Integration Tests', () => {
     expect(mockProfile.telegramId).toBe('12345');
     expect(mockProfile.firstName).toBe('John');
     expect(mockProfile.lastName).toBe('Doe');
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(mockProfile.save).toHaveBeenCalled();
   });
 

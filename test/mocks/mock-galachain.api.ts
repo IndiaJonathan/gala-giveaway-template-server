@@ -85,7 +85,8 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
-  async transferToken(dto: TransferTokenRequest, signer?: SigningClient) {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  transferToken(dto: TransferTokenRequest, signer?: SigningClient) {
     const transferFrom =
       signer?.galaChainAddress || this.adminSigner.galaChainAddress;
 
@@ -95,7 +96,7 @@ export class MockGalachainApi implements OnModuleInit {
       transferFrom,
     );
     this.grantBalanceForToken(dto.to, dto.tokenInstance, Number(dto.quantity));
-    const newBalances = await this.getBalancesForToken(
+    const newBalances = this.getBalancesForToken(
       dto.to,
       dto.tokenInstance as any,
     );
@@ -129,7 +130,7 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
-  async getBalancesForToken(
+  getBalancesForToken(
     ownerAddress: string,
     tokenClassKey: TokenInstanceKeyDto,
   ) {
@@ -155,11 +156,11 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
-  async getAllowanceAmount(
+  getAllowanceAmount(
     ownerAddress: string,
     tokenClassKey: TokenClassKeyProperties,
   ) {
-    const allowances = await this.getAllowancesForToken(
+    const allowances = this.getAllowancesForToken(
       ownerAddress,
       tokenClassKey,
     );

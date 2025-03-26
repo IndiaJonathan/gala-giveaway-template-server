@@ -53,7 +53,7 @@ describe('Profile related functions', () => {
       const mockGcAddress = 'eth|0x1234567890abcdef1234567890abcdef12345678';
       jest
         .spyOn(web3wallet, 'validateSignature')
-        .mockReturnValue(mockGcAddress);
+        .mockImplementation(() => mockGcAddress);
 
       // Mock findProfileByGC to return a profile object
       const mockProfile = {
@@ -73,7 +73,7 @@ describe('Profile related functions', () => {
       // Mock the checkTelegramAuthorization to return true
       jest
         .spyOn(profileService, 'checkTelegramAuthorization')
-        .mockReturnValue(true);
+        .mockImplementation(() => true);
 
       // Create test LinkDto with the proper camelCase properties
       const linkDto: LinkDto = {
@@ -94,6 +94,7 @@ describe('Profile related functions', () => {
       await profileController.linkAccounts(linkDto);
 
       // Verify that save was called on the profile with the correct data
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockProfile.save).toHaveBeenCalled();
       expect(mockProfile.telegramId).toBe(
         linkDto['Telegram User ID'].toString(),
@@ -102,12 +103,12 @@ describe('Profile related functions', () => {
       expect(mockProfile.lastName).toBe('Doe');
     });
 
-    it('should handle LinkDto with different property name formats', async () => {
+    it('should handle LinkDto with different property name formats', () => {
       // Mock the necessary functions
       const mockGcAddress = 'eth|0x1234567890abcdef1234567890abcdef12345678';
       jest
         .spyOn(web3wallet, 'validateSignature')
-        .mockReturnValue(mockGcAddress);
+        .mockImplementation(() => mockGcAddress);
 
       // Create a mock profile service with a testable implementation of checkTelegramAuthorization
       const checkAuthSpy = jest.spyOn(
