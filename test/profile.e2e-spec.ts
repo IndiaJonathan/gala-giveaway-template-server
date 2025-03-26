@@ -68,7 +68,7 @@ describe('Profile related functions', () => {
 
       jest
         .spyOn(profileService, 'findProfileByGC')
-        .mockResolvedValue(mockProfile);
+        .mockResolvedValue(mockProfile as any);
 
       // Mock the checkTelegramAuthorization to return true
       jest
@@ -82,14 +82,12 @@ describe('Profile related functions', () => {
         domain: { name: 'ETH' },
         types: ['eth'],
         'GalaChain Address': mockGcAddress,
-        'Telegram User': {
-          id: 12345,
-          first_name: 'John',
-          last_name: 'Doe',
-          auth_date: new Date().getTime(),
-          hash: 'fooo',
-          username: 'john_doe',
-        },
+        'Telegram User ID': 12345,
+        'Telegram First Name': 'John',
+        'Telegram Last Name': 'Doe',
+        'Telegram Auth Date': new Date().getTime(),
+        'Telegram Hash': 'fooo',
+        'Telegram Username': 'john_doe',
       };
 
       // Call the linkAccounts method
@@ -98,7 +96,7 @@ describe('Profile related functions', () => {
       // Verify that save was called on the profile with the correct data
       expect(mockProfile.save).toHaveBeenCalled();
       expect(mockProfile.telegramId).toBe(
-        linkDto['Telegram User'].id.toString(),
+        linkDto['Telegram User ID'].toString(),
       );
       expect(mockProfile.firstName).toBe('John');
       expect(mockProfile.lastName).toBe('Doe');
