@@ -48,7 +48,7 @@ export class MockGalachainApi implements OnModuleInit {
 
   private tokenBalances: Map<string, [TokenBalance]> = new Map();
 
-  async onModuleInit() {
+  onModuleInit() {
     const privateKey = this.secrets['GIVEAWAY_PRIVATE_KEY'];
     this.adminSigner = new SigningClient(privateKey);
 
@@ -78,7 +78,7 @@ export class MockGalachainApi implements OnModuleInit {
     return address.replace('0x', 'eth|');
   }
 
-  async fetchBalances(ownerAddress: string) {
+  fetchBalances(ownerAddress: string) {
     return {
       success: true,
       Data: this.tokenBalances[ownerAddress] || [],
@@ -122,7 +122,7 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
-  async burnToken(request: BurnTokensRequest) {
+  burnToken(request: BurnTokensRequest) {
     return {
       success: true,
       message: `Successfully burned tokens.`,
@@ -142,7 +142,7 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
-  async getAllowancesForToken(
+  getAllowancesForToken(
     ownerAddress: string,
     tokenClassKey: TokenClassKeyProperties,
   ) {
@@ -224,7 +224,7 @@ export class MockGalachainApi implements OnModuleInit {
 
   //TODO: add checks to see if the user has a mint allowance
   //TODO: mimic gas fee here too
-  async batchMintToken(dto: BatchMintTokenRequest, signer?: SigningClient) {
+  batchMintToken(dto: BatchMintTokenRequest, signer?: SigningClient) {
     // const signer = recoverWalletAddressFromSignature(dto);
     (dto.mintDtos as unknown as MintTokenDto[]).forEach((mint) => {
       console.log(mint.signerAddress);
@@ -244,7 +244,7 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
-  async isRegistered(address: string) {
+  isRegistered(address: string) {
     //check if it has been registered above
     if (this.registeredAddresses.has(address)) {
       return {
@@ -258,7 +258,7 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
-  async createRandomWallet(_registrationEndpoint: string) {
+  createRandomWallet(_registrationEndpoint: string) {
     return {
       success: true,
       wallet: {

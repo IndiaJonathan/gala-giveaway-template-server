@@ -14,6 +14,7 @@ import { GiveawayTokenType } from '../dtos/giveaway.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { WinDocument } from '../schemas/ClaimableWin.schema';
+import { GalaChainResponseType } from '@gala-chain/api';
 
 @Injectable()
 export class GivewayScheduler {
@@ -105,7 +106,7 @@ export class GivewayScheduler {
               },
               giveawayWalletSigner,
             );
-            if (mintResult.Status === 1) {
+            if (mintResult.Status === GalaChainResponseType.Success) {
               giveaway.giveawayStatus = GiveawayStatus.Completed;
               console.log(`Giveway done!`);
 
