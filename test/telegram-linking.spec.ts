@@ -11,6 +11,7 @@ import request from 'supertest';
 import * as web3wallet from '../src/utils/web3wallet';
 import { ProfileService } from '../src/profile-module/profile.service';
 import { ProfileDocument } from '../src/schemas/ProfileSchema';
+import { DomainDto } from '../src/dtos/SignedPayloadBase.dto';
 
 jest.mock('../src/utils/web3wallet', () => ({
   validateSignature: jest.fn(),
@@ -73,9 +74,14 @@ describe('Telegram Linking Integration Tests', () => {
     const linkData: LinkDto = {
       signature: 'test-signature',
       'GalaChain Address': mockGcAddress,
-      id: '12345',
-      firstName: 'John',
-      lastName: 'Doe',
+      'Telegram User ID': 12345,
+      'Telegram First Name': 'John',
+      'Telegram Last Name': 'Doe',
+      'Telegram Auth Date': 0,
+      'Telegram Hash': '',
+      prefix: '',
+      domain: new DomainDto(),
+      types: undefined,
     };
 
     // Make the API call

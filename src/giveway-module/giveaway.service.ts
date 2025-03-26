@@ -114,7 +114,7 @@ export class GiveawayService {
       const filteredGiveaway = filterGiveawayData(giveaway);
 
       // Remove the 'winners' field
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       const { winners, ...rest } = filteredGiveaway;
 
       if (giveaway.giveawayType === 'FirstComeFirstServe') {
