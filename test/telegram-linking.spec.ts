@@ -68,7 +68,7 @@ describe('Telegram Linking Integration Tests', () => {
     // Mock the checkTelegramAuthorization method to return true
     jest
       .spyOn(profileService, 'checkTelegramAuthorization')
-      .mockReturnValue(true);
+      .mockImplementation(() => true);
 
     // Create test data with firstName and lastName
     const linkData: LinkDto = {

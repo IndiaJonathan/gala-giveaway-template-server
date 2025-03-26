@@ -42,7 +42,7 @@ export class GivewayScheduler {
       );
       if (!creatorProfile) {
         console.error(
-          `Creator profile not found for giveaway: ${giveaway._id}`,
+          `Creator profile not found for giveaway: ${giveaway._id.toString()}`,
         );
         await handleGiveawayError(giveaway, 'Creator profile not found');
         continue;
@@ -98,7 +98,7 @@ export class GivewayScheduler {
           console.log(`Burn Giveaway done!`);
         } else {
           //Mint directly
-          if (giveaway.giveawayTokenType === GiveawayTokenType.ALLOWANCE) {
+          if (giveaway.giveawayTokenType.toString() === GiveawayTokenType.ALLOWANCE.toString()) {
             const mintResult = await this.galachainApi.batchMintToken(
               {
                 mintDtos: mappedWinners as any,
@@ -129,7 +129,7 @@ export class GivewayScheduler {
                 `Giveaway had errors, will retry later. Error: ${(mintResult as any).message}`,
               );
             }
-          } else if (giveaway.giveawayTokenType === GiveawayTokenType.BALANCE) {
+          } else if (giveaway.giveawayTokenType.toString() === GiveawayTokenType.BALANCE.toString()) {
             const transfers = await Promise.all(
               mappedWinners.map(async (winner) => {
                 try {
@@ -252,7 +252,7 @@ async function throwAndLogGiveawayError(
 ) {
   giveaway.giveawayErrors.push(error);
   await giveaway.save();
-  throw error;
+  throw new Error(error);
 }
 
 /**
@@ -283,7 +283,7 @@ async function handleGiveawayError(
   if (giveaway.giveawayErrors.length > 5) {
     giveaway.giveawayStatus = GiveawayStatus.Errored;
     console.error(
-      `Giveaway: ${giveaway._id} has errored out after ${giveaway.giveawayErrors.length} errors!!!`,
+      `Giveaway: ${giveaway._id.toString()} has errored out after ${giveaway.giveawayErrors.length} errors!!!`,
     );
   }
 

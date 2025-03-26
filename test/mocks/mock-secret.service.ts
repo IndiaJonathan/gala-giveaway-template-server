@@ -8,7 +8,7 @@ export class MockSecretConfigService {
     this.secretsRecord = secretsRecord;
   }
 
-  async getSecret(secretKey: string) {
+  getSecret(secretKey: string) {
     console.log('---------------------');
     console.log(secretKey);
     console.log('---------------------');

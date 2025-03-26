@@ -14,6 +14,8 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "lint:errors": "eslint \"{src,apps,libs,test}/**/*.ts\" --quiet",
+    "lint:errors:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --quiet --fix",
     "test:unit": "cross-env TESTING=true jest",
     "test": "npm run test:unit && npm run test:e2e",
     "test:watch": "jest --watch",

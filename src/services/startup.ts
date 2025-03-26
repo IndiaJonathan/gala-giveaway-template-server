@@ -15,7 +15,7 @@ export class StartupService implements OnModuleInit {
     const privateKey = await this.secrets['GIVEAWAY_PRIVATE_KEY'];
     this.adminWallet = new Wallet(privateKey);
 
-    this.profileService.checkAndRegisterProfile(
+    await this.profileService.checkAndRegisterProfile(
       this.adminWallet.signingKey.privateKey,
     );
   }

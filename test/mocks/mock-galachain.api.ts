@@ -106,7 +106,7 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
-  async mintToken(dto: MintTokenRequest, signer?: SigningClient) {
+  mintToken(dto: MintTokenRequest, signer?: SigningClient) {
     // Get the signer address
     const signerAddress =
       signer?.galaChainAddress || this.adminSigner.galaChainAddress;

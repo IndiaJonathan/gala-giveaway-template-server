@@ -113,7 +113,7 @@ describe('Profile related functions', () => {
       const checkAuthSpy = jest.spyOn(
         profileService,
         'checkTelegramAuthorization',
-      );
+      ).mockImplementation((data, token) => true);
 
       // Test with camelCase property names
       const camelCaseData = {

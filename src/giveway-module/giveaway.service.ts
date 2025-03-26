@@ -11,7 +11,7 @@ import {
   GiveawayStatus,
   Winner,
 } from '../schemas/giveaway.schema';
-import { signatures, TokenClassKeyProperties } from '@gala-chain/api';
+import { GalaChainResponseType, signatures, TokenClassKeyProperties } from '@gala-chain/api';
 import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
 import { GiveawayDto, GiveawayTokenType } from '../dtos/giveaway.dto';
@@ -498,7 +498,7 @@ export class GiveawayService {
 
       const result = await this.galachainApi.burnToken(claimDto);
       console.log(result);
-      if (result.Status !== 1) {
+      if (result.Status !== GalaChainResponseType.Success) {
         throw new BadRequestException(
           `Burn request failed, cannot claim. Error: ${JSON.stringify(result)}`,
         );

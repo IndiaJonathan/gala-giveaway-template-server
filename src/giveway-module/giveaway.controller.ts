@@ -181,8 +181,9 @@ export class GiveawayController {
   }
 
   @Post('estimate-fee')
-  async estimateFee(@Body() gasFeeDto: GasFeeEstimateRequestDto) {
-    return this.giveawayService.getRequiredGalaGasFeeForGiveaway(gasFeeDto);
+  estimateFee(@Body() gasFeeDto: GasFeeEstimateRequestDto) {
+    const result = this.giveawayService.getRequiredGalaGasFeeForGiveaway(gasFeeDto);
+    return result;
   }
 
   @Get('all')
@@ -224,7 +225,7 @@ export class GiveawayController {
         Status: paymentInfo.Status || 1,
         success: true,
       },
-    };
+    } as const;
   }
 
   @Post('randomgiveaway/claim')
@@ -258,7 +259,7 @@ export class GiveawayController {
       //todo: handle if already burnt
       const result = await this.tokenService.burnToken(giveawayDto);
       console.log(result);
-      if (result.Status === 1) {
+      if (result.Status?.toString() === '1') {
         //Good to go
         claimableWin.claimInfo = JSON.stringify(result);
         const mintToken = await this.giveawayService.sendWinnings(
@@ -266,14 +267,14 @@ export class GiveawayController {
           new BigNumber(claimableWin.amountWon),
           claimableWin.giveaway,
         );
-        if (mintToken.Status === 1) {
+        if (mintToken.Status?.toString() === '1') {
           claimableWin.claimed = true;
           return await claimableWin.save();
         } else {
           console.error(
             `Unable to mint, here is the dto: ${JSON.stringify(mintToken)}`,
           );
-          return;
+          return undefined;
         }
       }
       res.status(HttpStatus.OK).json({ success: true });
@@ -337,7 +338,7 @@ export class GiveawayController {
       giveawayWallet: userInfo.giveawayWalletAddress,
       galaNeededForOtherGiveaways,
       availableTokens,
-    };
+    } as const;
   }
 
   @Get('claimable-wins/:gcAddress')
@@ -417,7 +418,7 @@ export class GiveawayController {
         );
 
       //For the new giveaway
-      const gasForGiveaway =
+      const gasForGiveaway = 
         this.giveawayService.getRequiredGalaGasFeeForGiveaway(giveawayDto);
 
       const requiredGas = escrowGas.plus(gasForGiveaway);
