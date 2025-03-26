@@ -152,6 +152,7 @@ export class GiveawayController {
           `Insuffucient GALA balance in Giveway wallet, need additional ${net.multipliedBy(-1)}`,
         );
       }
+      
 
       const createdGiveaway = await this.giveawayService.createGiveaway(
         publicKey,
@@ -298,6 +299,14 @@ export class GiveawayController {
       tokenDto.tokenType,
     );
 
+    const availableTokens =
+      await this.giveawayService.getNetAvailableTokenQuantity(
+        userInfo.giveawayWalletAddress,
+        userInfo._id as ObjectId,
+        tokenDto.tokenInstanceKey,
+        tokenDto.tokenType,
+      );
+
     const tokenBalances = await this.tokenService.getBalancesForToken(
       userInfo.giveawayWalletAddress,
       tokenDto.tokenInstanceKey,
@@ -327,6 +336,7 @@ export class GiveawayController {
       galaBalance,
       giveawayWallet: userInfo.giveawayWalletAddress,
       galaNeededForOtherGiveaways,
+      availableTokens,
     };
   }
 

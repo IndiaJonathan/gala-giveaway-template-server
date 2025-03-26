@@ -636,7 +636,7 @@ describe('Giveaway Controller (e2e)', () => {
     const fcfsGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'FirstComeFirstServe',
-      claimPerUser: '2',
+      winPerUser: '2',
       maxWinners: '5',
       uniqueKey: `giveaway-start-${new Date()}`,
     };
@@ -678,7 +678,7 @@ describe('Giveaway Controller (e2e)', () => {
         expect(res.body).toMatchObject({
           success: true,
           message: expect.stringContaining(
-            `You successfully claimed ${fcfsGiveaway.claimPerUser} of GALA`,
+            `You successfully claimed ${fcfsGiveaway.winPerUser} of GALA`,
           ),
           transactionDetails: {
             Status: 1,
@@ -700,7 +700,7 @@ describe('Giveaway Controller (e2e)', () => {
       .exec();
 
     expect(winEntries.length).toBe(1);
-    expect(winEntries[0].amountWon).toBe(fcfsGiveaway.claimPerUser);
+    expect(winEntries[0].amountWon).toBe(fcfsGiveaway.winPerUser);
     expect(winEntries[0].claimed).toBe(true);
   });
 
@@ -719,7 +719,7 @@ describe('Giveaway Controller (e2e)', () => {
     const fcfsGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'FirstComeFirstServe',
-      claimPerUser: '1',
+      winPerUser: '1',
       maxWinners: '1',
     };
 
@@ -760,7 +760,7 @@ describe('Giveaway Controller (e2e)', () => {
         expect(res.body).toMatchObject({
           success: true,
           message: expect.stringContaining(
-            `You successfully claimed ${fcfsGiveaway.claimPerUser} of GALA`,
+            `You successfully claimed ${fcfsGiveaway.winPerUser} of GALA`,
           ),
           transactionDetails: {
             Status: 1,
@@ -780,13 +780,13 @@ describe('Giveaway Controller (e2e)', () => {
       .exec();
 
     expect(winEntries.length).toBe(1);
-    expect(winEntries[0].amountWon).toBe(fcfsGiveaway.claimPerUser);
+    expect(winEntries[0].amountWon).toBe(fcfsGiveaway.winPerUser);
 
     // 4. Attempt to start a new FCFS giveaway
     const secondFcfsGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'FirstComeFirstServe',
-      claimPerUser: 1,
+      winPerUser: 1,
       maxWinners: 1,
     };
 
@@ -831,13 +831,13 @@ describe('Giveaway Controller (e2e)', () => {
     // Helper function to create and verify a FCFS giveaway
     const createFCFSGiveaway = async (
       creator,
-      claimPerUser = '1',
+      winPerUser = '1',
       maxWinners = '1',
     ) => {
       const giveawayData = {
         ...startBalanceGiveaway,
         giveawayType: 'FirstComeFirstServe',
-        claimPerUser,
+        winPerUser,
         maxWinners,
       };
 
@@ -861,7 +861,7 @@ describe('Giveaway Controller (e2e)', () => {
     };
 
     // Helper function to claim a FCFS giveaway
-    const claimFCFSGiveaway = async (user, giveawayId, claimPerUser) => {
+    const claimFCFSGiveaway = async (user, giveawayId, winPerUser) => {
       const claimData = {
         giveawayId,
         uniqueKey: `giveaway-claim-${new Date()}`,
@@ -880,7 +880,7 @@ describe('Giveaway Controller (e2e)', () => {
           expect(res.body).toMatchObject({
             success: true,
             message: expect.stringContaining(
-              `You successfully claimed ${claimPerUser} of GALA`,
+              `You successfully claimed ${winPerUser} of GALA`,
             ),
             transactionDetails: {
               Status: 1,
@@ -900,7 +900,7 @@ describe('Giveaway Controller (e2e)', () => {
         .exec();
 
       expect(winEntries.length).toBe(1);
-      expect(winEntries[0].amountWon).toBe(claimPerUser);
+      expect(winEntries[0].amountWon).toBe(winPerUser);
     };
 
     // 1. Create the giveaway creator with only enough tokens for 1 giveaway
@@ -921,14 +921,14 @@ describe('Giveaway Controller (e2e)', () => {
     await claimFCFSGiveaway(
       giveawayUser,
       giveawayId,
-      giveawayData.claimPerUser,
+      giveawayData.winPerUser,
     );
 
     // 4. Try to create a second FCFS giveaway, which should fail due to insufficient tokens
     const secondGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'FirstComeFirstServe',
-      claimPerUser: 1,
+      winPerUser: 1,
       maxWinners: 1,
     };
 
@@ -966,13 +966,13 @@ describe('Giveaway Controller (e2e)', () => {
     // Helper functions for creating FCFS giveaways and claiming them
     const createFCFSGiveaway = async (
       creator,
-      claimPerUser = '1',
+      winPerUser = '1',
       maxWinners = '2',
     ) => {
       const giveawayData = {
         ...startBalanceGiveaway,
         giveawayType: 'FirstComeFirstServe',
-        claimPerUser,
+        winPerUser,
         maxWinners,
       };
 
@@ -998,7 +998,7 @@ describe('Giveaway Controller (e2e)', () => {
     const claimFCFSGiveaway = async (
       user,
       giveawayId,
-      claimPerUser,
+      winPerUser,
       uniqueSuffix,
     ) => {
       const claimData = {
@@ -1027,7 +1027,7 @@ describe('Giveaway Controller (e2e)', () => {
         .exec();
 
       expect(winEntries.length).toBe(1);
-      expect(winEntries[0].amountWon).toBe(claimPerUser);
+      expect(winEntries[0].amountWon).toBe(winPerUser);
     };
 
     // 1. Create a creator with enough tokens for multiple giveaways
@@ -1047,7 +1047,7 @@ describe('Giveaway Controller (e2e)', () => {
     // 3. Create an FCFS giveaway with 2 max winners, 1 token per claim
     const { giveawayId, giveawayData } = await createFCFSGiveaway(
       giveawayCreator,
-      '1', // claimPerUser
+      '1', // winPerUser
       '2', // maxWinners
     );
 
@@ -1071,14 +1071,14 @@ describe('Giveaway Controller (e2e)', () => {
     await claimFCFSGiveaway(
       user1,
       giveawayId,
-      giveawayData.claimPerUser,
+      giveawayData.winPerUser,
       'user1',
     );
 
     await claimFCFSGiveaway(
       user2,
       giveawayId,
-      giveawayData.claimPerUser,
+      giveawayData.winPerUser,
       'user2',
     );
 
@@ -1128,13 +1128,13 @@ describe('Giveaway Controller (e2e)', () => {
     // Helper functions for creating FCFS giveaways and claiming them
     const createFCFSGiveaway = async (
       creator,
-      claimPerUser = '1',
+      winPerUser = '1',
       maxWinners = '3',
     ) => {
       const giveawayData = {
         ...startBalanceGiveaway,
         giveawayType: 'FirstComeFirstServe',
-        claimPerUser,
+        winPerUser,
         maxWinners,
       };
 
@@ -1160,7 +1160,7 @@ describe('Giveaway Controller (e2e)', () => {
     const claimFCFSGiveaway = async (
       user,
       giveawayId,
-      claimPerUser,
+      winPerUser,
       uniqueSuffix,
     ) => {
       const claimData = {
@@ -1189,7 +1189,7 @@ describe('Giveaway Controller (e2e)', () => {
         .exec();
 
       expect(winEntries.length).toBe(1);
-      expect(winEntries[0].amountWon).toBe(claimPerUser);
+      expect(winEntries[0].amountWon).toBe(winPerUser);
     };
 
     // 1. Create a creator with enough tokens for the giveaway
@@ -1209,7 +1209,7 @@ describe('Giveaway Controller (e2e)', () => {
     // 3. Create an FCFS giveaway with 3 max winners, 2 tokens per claim (total: 6 tokens)
     const { giveawayId, giveawayData } = await createFCFSGiveaway(
       giveawayCreator,
-      '2', // claimPerUser
+      '2', // winPerUser
       '3', // maxWinners
     );
 
@@ -1223,7 +1223,7 @@ describe('Giveaway Controller (e2e)', () => {
     // The new estimate should include the escrow for the unclaimed giveaway
     expect(estimateAfterCreate.toNumber()).toBe(
       initialFeeEstimate.toNumber() +
-        BigNumber(giveawayData.claimPerUser)
+        BigNumber(giveawayData.winPerUser)
           .multipliedBy(giveawayData.maxWinners)
           .plus(giveawayData.maxWinners)
           .toNumber(), // 1 gas fee per claim
@@ -1238,7 +1238,7 @@ describe('Giveaway Controller (e2e)', () => {
     await claimFCFSGiveaway(
       user1,
       giveawayId,
-      giveawayData.claimPerUser,
+      giveawayData.winPerUser,
       'user1',
     );
 
@@ -1259,7 +1259,7 @@ describe('Giveaway Controller (e2e)', () => {
     const newMaxWinners = new BigNumber(giveawayData.maxWinners).minus(1);
     const expectedRemainingEscrow =
       initialFeeEstimate.toNumber() +
-      new BigNumber(giveawayData.claimPerUser)
+      new BigNumber(giveawayData.winPerUser)
         .multipliedBy(newMaxWinners)
         .toNumber() +
       newMaxWinners.toNumber(); // 1 gas fee per claim
@@ -1294,7 +1294,7 @@ describe('Giveaway Controller (e2e)', () => {
     await claimFCFSGiveaway(
       user2,
       giveawayId,
-      giveawayData.claimPerUser,
+      giveawayData.winPerUser,
       'user2',
     );
 
@@ -1313,7 +1313,7 @@ describe('Giveaway Controller (e2e)', () => {
     // We should have 1 winner remaining (2 tokens)
     const expectedRemainingEscrow2 =
       initialFeeEstimate.toNumber() +
-      new BigNumber(giveawayData.claimPerUser)
+      new BigNumber(giveawayData.winPerUser)
         .multipliedBy(new BigNumber(giveawayData.maxWinners).minus(2))
         .toNumber() +
       1; // -2 winners, +1 for gas fee
@@ -1342,7 +1342,7 @@ describe('Giveaway Controller (e2e)', () => {
     const fcfsGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'FirstComeFirstServe',
-      claimPerUser: '2',
+      winPerUser: '2',
       maxWinners: '5',
       uniqueKey: `giveaway-start-${new Date()}`,
     };
@@ -1384,7 +1384,7 @@ describe('Giveaway Controller (e2e)', () => {
         expect(res.body).toMatchObject({
           success: true,
           message: expect.stringContaining(
-            `You successfully claimed ${fcfsGiveaway.claimPerUser} of GALA`,
+            `You successfully claimed ${fcfsGiveaway.winPerUser} of GALA`,
           ),
           transactionDetails: {
             Status: 1,
@@ -1404,7 +1404,7 @@ describe('Giveaway Controller (e2e)', () => {
       .exec();
 
     expect(winEntries.length).toBe(1);
-    expect(winEntries[0].amountWon).toBe(fcfsGiveaway.claimPerUser);
+    expect(winEntries[0].amountWon).toBe(fcfsGiveaway.winPerUser);
 
     // This assertion should fail since claimed is currently set to false
     expect(winEntries[0].claimed).toBe(true);
@@ -1483,7 +1483,7 @@ describe('Giveaway Controller (e2e)', () => {
     const fcfsGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'FirstComeFirstServe',
-      claimPerUser: '2',
+      winPerUser: '2',
       maxWinners: '3',
       uniqueKey: `giveaway-start-${new Date().getTime()}`,
     };
@@ -1553,7 +1553,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     // Verify amount is set correctly
     expect(winEntry.amountWon).toBeDefined();
-    expect(winEntry.amountWon).toBe(fcfsGiveaway.claimPerUser.toString());
+    expect(winEntry.amountWon).toBe(fcfsGiveaway.winPerUser.toString());
 
     // Verify winningInfo is also set
     expect(winEntry.winningInfo).toBeDefined();

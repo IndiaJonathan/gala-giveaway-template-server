@@ -65,7 +65,7 @@ export class BasicGiveawaySettingsDto {
 export class FirstComeFirstServeGiveawaySettingsDto extends BasicGiveawaySettingsDto {
   @IsNumberString()
   @IsNotEmpty()
-  claimPerUser?: string;
+  winPerUser?: string;
 
   @IsString()
   @IsNotEmpty()

@@ -22,9 +22,8 @@ export interface GiveawayDocument extends Document {
   endDateTime: Date;
   giveawayType: 'FirstComeFirstServe' | 'DistributedGiveaway';
   giveawayToken: TokenClassKeyProperties;
-  winPerUser?: string; // Only for DistributedGiveaway
+  winPerUser: string;
   winners: Winner[];
-  claimPerUser?: number; // Only for FCFS
   maxWinners: number;
   usersSignedUp?: string[]; //Only for distributed giveaway
   giveawayStatus: GiveawayStatus;
@@ -63,20 +62,12 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
   // For Random Giveaway
   winPerUser: {
     type: String,
-    required: function (this: GiveawayDocument) {
-      return this.giveawayType === 'DistributedGiveaway';
-    },
+    required: true,
   },
   winners: {
     type: [WinnerSchema],
     default: [],
     required: true,
-  },
-  claimPerUser: {
-    type: Number,
-    required: function (this: GiveawayDocument) {
-      return this.giveawayType === 'FirstComeFirstServe';
-    },
   },
   maxWinners: {
     type: Number,

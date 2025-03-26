@@ -479,7 +479,7 @@ export class GiveawayService {
     ) {
       throw new BadRequestException(`You've already claimed this!`);
     }
-    if (!giveaway.claimPerUser)
+    if (!giveaway.winPerUser)
       throw new BadRequestException('Giveway lacks claim per user');
 
     await this.runGiveawayChecks(giveaway, gcAddress);
@@ -488,7 +488,7 @@ export class GiveawayService {
     const winEntry = new this.winModel({
       giveaway: giveaway.id,
       gcAddress,
-      amountWon: giveaway.claimPerUser,
+      amountWon: giveaway.winPerUser,
       claimed: true,
       giveawayType: giveaway.giveawayType,
     });
@@ -523,7 +523,7 @@ export class GiveawayService {
         // Transfer token if it's a balance token
         paymentResult = await this.galachainApi.transferToken(
           {
-            quantity: new BigNumber(giveaway.claimPerUser),
+            quantity: new BigNumber(giveaway.winPerUser),
             to: gcAddress,
             tokenInstance: {
               ...giveaway.giveawayToken,
@@ -536,7 +536,7 @@ export class GiveawayService {
         // Mint token if it's an allowance token
         paymentResult = await this.galachainApi.mintToken(
           {
-            quantity: new BigNumber(giveaway.claimPerUser),
+            quantity: new BigNumber(giveaway.winPerUser),
             tokenClass: giveaway.giveawayToken,
             owner: gcAddress,
           },
@@ -560,7 +560,7 @@ export class GiveawayService {
     // Update the giveaway with the new winner
     const winner: Winner = {
       gcAddress,
-      winAmount: giveaway.claimPerUser.toString(),
+      winAmount: giveaway.winPerUser.toString(),
       completed: true,
     };
 
@@ -590,9 +590,7 @@ export class GiveawayService {
   getRequiredTokensForGiveaway(giveaway: GiveawayDocument | GiveawayDto) {
     switch (giveaway.giveawayType) {
       case 'FirstComeFirstServe':
-        return BigNumber(giveaway.claimPerUser).multipliedBy(
-          giveaway.maxWinners,
-        );
+        return BigNumber(giveaway.winPerUser).multipliedBy(giveaway.maxWinners);
       case 'DistributedGiveaway':
         return BigNumber(giveaway.winPerUser).multipliedBy(
           BigNumber(giveaway.maxWinners),
@@ -673,7 +671,7 @@ export class GiveawayService {
               0,
               giveaway.maxWinners - claimedWinners,
             );
-            tokensInEscrow = new BigNumber(giveaway.claimPerUser).multipliedBy(
+            tokensInEscrow = new BigNumber(giveaway.winPerUser).multipliedBy(
               remainingWinners,
             );
           } else {
@@ -743,9 +741,7 @@ export class GiveawayService {
             );
 
             totalQuantity = BigNumber(totalQuantity).minus(
-              new BigNumber(remainingWinners).multipliedBy(
-                giveaway.claimPerUser,
-              ),
+              new BigNumber(remainingWinners).multipliedBy(giveaway.winPerUser),
             );
         }
       });

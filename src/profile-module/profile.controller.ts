@@ -19,6 +19,7 @@ import { GalachainApi } from '../web3-module/galachain.api';
 import { isAddress } from 'ethers';
 import { validateSignature } from '../utils/web3wallet';
 import { filterGiveawaysData } from '../utils/giveaway-utils';
+import { LinkDto } from '../dtos/profile.dto';
 
 @Controller('api/profile')
 export class ProfileController {
@@ -57,7 +58,7 @@ export class ProfileController {
   }
 
   @Post('link-accounts')
-  async linkAccounts(@Body() linkDto: any) {
+  async linkAccounts(@Body() linkDto: LinkDto) {
     const botToken = await this.secrets['TELEGRAM_BOT_TOKEN'];
 
     if (!botToken) {
@@ -76,9 +77,19 @@ export class ProfileController {
       );
     }
 
+    // Create a Telegram user object from LinkDto properties
+    const telegramUser = {
+      id: linkDto['Telegram User ID'],
+      first_name: linkDto['Telegram First Name'],
+      auth_date: linkDto['Telegram Auth Date'],
+      hash: linkDto['Telegram Hash'],
+      ...(linkDto['Telegram Last Name'] && { last_name: linkDto['Telegram Last Name'] }),
+      ...(linkDto['Telegram Username'] && { username: linkDto['Telegram Username'] }),
+      ...(linkDto['Telegram Photo URL'] && { photo_url: linkDto['Telegram Photo URL'] }),
+    };
     // Validate Telegram authorization
     const isTelegramValid = this.profileService.checkTelegramAuthorization(
-      linkDto['Telegram User'],
+      telegramUser,
       botToken,
     );
 
@@ -87,9 +98,9 @@ export class ProfileController {
       const profile = await this.profileService.findProfileByGC(
         linkDto['GalaChain Address'],
       );
-      profile.telegramId = linkDto['Telegram User'].id.toString();
-      profile.firstName = linkDto['Telegram User'].first_name;
-      profile.lastName = linkDto['Telegram User'].last_name;
+      profile.telegramId = telegramUser.id.toString();
+      profile.firstName = telegramUser.first_name;
+      profile.lastName = telegramUser.last_name || null;
       try {
         await profile.save();
       } catch (error) {
