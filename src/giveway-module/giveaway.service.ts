@@ -11,7 +11,11 @@ import {
   GiveawayStatus,
   Winner,
 } from '../schemas/giveaway.schema';
-import { GalaChainResponseType, signatures, TokenClassKeyProperties } from '@gala-chain/api';
+import {
+  GalaChainResponseType,
+  signatures,
+  TokenClassKeyProperties,
+} from '@gala-chain/api';
 import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
 import { GiveawayDto, GiveawayTokenType } from '../dtos/giveaway.dto';
@@ -114,7 +118,7 @@ export class GiveawayService {
       const filteredGiveaway = filterGiveawayData(giveaway);
 
       // Remove the 'winners' field
-       
+
       const { winners, ...rest } = filteredGiveaway;
 
       if (giveaway.giveawayType === 'FirstComeFirstServe') {
@@ -159,6 +163,7 @@ export class GiveawayService {
 
         // Extract only the requested fields from giveaway
         const selectedGiveawayFields = {
+          name: filteredGiveaway.name,
           endDateTime: filteredGiveaway.endDateTime,
           giveawayType: filteredGiveaway.giveawayType,
           giveawayToken: filteredGiveaway.giveawayToken,
@@ -241,6 +246,8 @@ export class GiveawayService {
           giveawayToken: '$giveawayDetails.giveawayToken',
           burnToken: '$giveawayDetails.burnToken',
           burnTokenQuantity: '$giveawayDetails.burnTokenQuantity',
+          timeWon: 1,
+          timeClaimed: 1,
         },
       },
     ]);
@@ -260,6 +267,7 @@ export class GiveawayService {
           amountWon: winner.winAmount,
           gcAddress: winner.gcAddress,
           giveawayType: giveaway.giveawayType,
+          timeWon: new Date(),
         }),
     );
     try {
@@ -490,6 +498,8 @@ export class GiveawayService {
       gcAddress,
       amountWon: giveaway.winPerUser,
       claimed: true,
+      timeWon: new Date(),
+      timeClaimed: new Date(),
       giveawayType: giveaway.giveawayType,
     });
 
@@ -590,40 +600,61 @@ export class GiveawayService {
   getRequiredTokensForGiveaway(giveaway: GiveawayDocument | GiveawayDto) {
     switch (giveaway.giveawayType) {
       case 'FirstComeFirstServe':
-        return BigNumber(giveaway.winPerUser).multipliedBy(giveaway.maxWinners);
+        // For FCFS, we need to calculate based on remaining claims
+        if (
+          'winners' in giveaway &&
+          giveaway.winners &&
+          giveaway.winners.length
+        ) {
+          // Calculate remaining tokens to reserve based on remaining potential winners
+          const claimedWinners = giveaway.winners.length;
+          const remainingWinners = Math.max(
+            0,
+            giveaway.maxWinners - claimedWinners,
+          );
+          return new BigNumber(giveaway.winPerUser).multipliedBy(
+            remainingWinners,
+          );
+        }
+        // If no winners yet or not a GiveawayDocument, return the full amount
+        return new BigNumber(giveaway.winPerUser).multipliedBy(
+          giveaway.maxWinners,
+        );
       case 'DistributedGiveaway':
-        return BigNumber(giveaway.winPerUser).multipliedBy(
-          BigNumber(giveaway.maxWinners),
+        return new BigNumber(giveaway.winPerUser).multipliedBy(
+          giveaway.maxWinners,
         );
+      default:
+        throw new BadRequestException('Unsupported giveaway type');
     }
   }
 
-  async getTotalRequiredTokensAndEscrow(
-    ownerId: ObjectId,
-    giveaway?: GiveawayDocument | GiveawayDto,
-  ) {
-    const unDistributedGiveaways = await this.findUndistributed(
-      ownerId,
-      giveaway.giveawayToken,
-    );
-    let totalTokensRequired = unDistributedGiveaways.reduce(
-      (accumulator, giveaway) => {
-        const tokens = new BigNumber(
-          this.getRequiredTokensForGiveaway(giveaway),
-        );
-        return accumulator.plus(tokens);
-      },
-      new BigNumber(0),
-    );
+  // async getTotalRequiredTokensAndEscrow(
+  //   ownerId: ObjectId,
+  //   giveaway?: GiveawayDocument | GiveawayDto,
+  // ) {
+  //   const unDistributedGiveaways = await this.findUndistributed(
+  //     ownerId,
+  //     giveaway.giveawayToken,
+  //   );
+  //   let totalTokensRequired = unDistributedGiveaways.reduce(
+  //     (accumulator, giveaway) => {
+  //       const tokens = new BigNumber(
+  //         this.getRequiredTokensForGiveaway(giveaway),
+  //       );
+  //       return accumulator.plus(tokens);
+  //     },
+  //     new BigNumber(0),
+  //   );
 
-    if (giveaway) {
-      totalTokensRequired = totalTokensRequired.plus(
-        this.getRequiredTokensForGiveaway(giveaway),
-      );
-    }
+  //   if (giveaway) {
+  //     totalTokensRequired = totalTokensRequired.plus(
+  //       this.getRequiredTokensForGiveaway(giveaway),
+  //     );
+  //   }
 
-    return totalTokensRequired;
-  }
+  //   return totalTokensRequired;
+  // }
 
   getRequiredGalaGasFeeForGiveaway(
     giveawayDoc: GiveawayDto | GiveawayDocument | GasFeeEstimateRequestDto,
@@ -775,6 +806,81 @@ export class GiveawayService {
     });
 
     return totalQuantity;
+  }
+
+  async getRequiredEscrow(ownerId: ObjectId) {
+    const unDistributedGiveaways = await this.findUndistributed(ownerId);
+
+    // Create a map to store required escrow by token class
+    const balanceEscrowRequirements: Map<
+      string,
+      TokenClassKeyProperties & { quantity: BigNumber }
+    > = new Map();
+    const allowanceEscrowRequirements: Map<
+      string,
+      TokenClassKeyProperties & { quantity: BigNumber }
+    > = new Map();
+
+    const galaKey = tokenToReadable(GALA_TOKEN);
+    balanceEscrowRequirements.set(galaKey, {
+      ...GALA_TOKEN,
+      quantity: new BigNumber(0),
+    });
+
+    unDistributedGiveaways.forEach((giveaway) => {
+      // Create a key for the token
+      const tokenKey = tokenToReadable(giveaway.giveawayToken);
+
+      // If this token isn't in our map yet, add it
+      if (giveaway.giveawayTokenType === GiveawayTokenType.BALANCE) {
+        if (!balanceEscrowRequirements.has(tokenKey)) {
+          balanceEscrowRequirements.set(tokenKey, {
+            ...giveaway.giveawayToken,
+            quantity: new BigNumber(0),
+          });
+        }
+      } else {
+        if (!allowanceEscrowRequirements.has(tokenKey)) {
+          allowanceEscrowRequirements.set(tokenKey, {
+            ...giveaway.giveawayToken,
+            quantity: new BigNumber(0),
+          });
+        }
+      }
+
+      // Calculate required tokens for the giveaway
+      let requiredTokens = this.getRequiredTokensForGiveaway(giveaway);
+
+      const galaFee = this.getRequiredGalaGasFeeForGiveaway(giveaway);
+      balanceEscrowRequirements.set(galaKey, {
+        ...GALA_TOKEN,
+        quantity: balanceEscrowRequirements.get(galaKey).quantity.plus(galaFee),
+      });
+
+      if (giveaway.giveawayTokenType === GiveawayTokenType.ALLOWANCE) {
+        allowanceEscrowRequirements.set(tokenKey, {
+          ...allowanceEscrowRequirements.get(tokenKey),
+          quantity: allowanceEscrowRequirements
+            .get(tokenKey)
+            .quantity.plus(requiredTokens),
+        });
+      } else {
+        balanceEscrowRequirements.set(tokenKey, {
+          ...balanceEscrowRequirements.get(tokenKey),
+          quantity: balanceEscrowRequirements
+            .get(tokenKey)
+            .quantity.plus(requiredTokens),
+        });
+      }
+    });
+
+    // Convert the map to an array of token class and quantity pairs
+    return {
+      balanceEscrowRequirements: Array.from(balanceEscrowRequirements.values()),
+      allowanceEscrowRequirements: Array.from(
+        allowanceEscrowRequirements.values(),
+      ),
+    };
   }
 
   /**

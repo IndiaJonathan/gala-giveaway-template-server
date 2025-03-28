@@ -20,6 +20,8 @@ import { isAddress } from 'ethers';
 import { validateSignature } from '../utils/web3wallet';
 import { filterGiveawaysData } from '../utils/giveaway-utils';
 import { LinkDto } from '../dtos/profile.dto';
+import { TokenBalance } from '@gala-chain/connect';
+import { tokenToReadable } from '../chain.helper';
 
 @Controller('api/profile')
 export class ProfileController {
@@ -57,6 +59,84 @@ export class ProfileController {
     };
   }
 
+  @Get('balances/:ethAddress')
+  async getBalances(@Param('ethAddress') ethAddress: string) {
+    const userInfo = await this.profileService.findProfileByEth(ethAddress);
+    const giveawayWalletBalances = await this.tokenService.fetchBalances(
+      userInfo.giveawayWalletAddress,
+    );
+
+    const userBalances = await this.tokenService.fetchBalances(
+      userInfo.galaChainAddress,
+    );
+
+    const requiredEscrow = await this.giveawayService.getRequiredEscrow(
+      userInfo.id,
+    );
+    
+
+    const escrowAllowances = await this.tokenService.getAllowances(userInfo.giveawayWalletAddress); 
+
+    // Combine balances and subtract escrow
+    const combinedBalances = {};
+    
+    // Helper function to safely parse quantity
+    const parseQuantity = (quantity) => 
+      quantity ? parseInt(quantity.toString()) : 0;
+    
+    // Helper function to add balance to combined map
+    const addBalance = (balance: TokenBalance) => {
+      
+      const tokenId = tokenToReadable(balance);
+      const quantity = parseQuantity(balance.quantity);
+      
+      if (combinedBalances[tokenId]) {
+        combinedBalances[tokenId].quantity += quantity;
+      } else {
+        combinedBalances[tokenId] = {
+          quantity,
+          token: tokenId,
+          additionalKey: balance.additionalKey,
+          category: balance.category,
+          collection: balance.collection,
+          type: balance.type,
+        };
+      }
+    };
+    
+    // Process user and giveaway balances
+    if (userBalances && userBalances.Data &&Array.isArray(userBalances.Data)) {
+      userBalances.Data.forEach(addBalance);
+    }
+    
+    if (giveawayWalletBalances && giveawayWalletBalances.Data && Array.isArray(giveawayWalletBalances.Data)) {
+      giveawayWalletBalances.Data.forEach(addBalance);
+    }
+    
+    // Subtract required escrow amounts
+    if (requiredEscrow && Array.isArray(requiredEscrow)) {
+      requiredEscrow.forEach(escrow => {
+        if (escrow && escrow.quantity) {
+          const tokenId = tokenToReadable(escrow);
+          const escrowQuantity = parseQuantity(escrow.quantity);
+          
+          if (combinedBalances[tokenId]) {
+            combinedBalances[tokenId].quantity -= escrowQuantity;
+            combinedBalances[tokenId].escrowAmount = escrowQuantity;
+          }
+        }
+      });
+    }
+
+    return {
+      availableBalances: Object.values(combinedBalances),
+      giveawayWalletBalances,
+      userBalances,
+      requiredEscrow,
+      escrowAllowances,
+    };
+  }
+
   @Post('link-accounts')
   async linkAccounts(@Body() linkDto: LinkDto) {
     const botToken = await this.secrets['TELEGRAM_BOT_TOKEN'];
@@ -83,9 +163,15 @@ export class ProfileController {
       first_name: linkDto['Telegram First Name'],
       auth_date: linkDto['Telegram Auth Date'],
       hash: linkDto['Telegram Hash'],
-      ...(linkDto['Telegram Last Name'] && { last_name: linkDto['Telegram Last Name'] }),
-      ...(linkDto['Telegram Username'] && { username: linkDto['Telegram Username'] }),
-      ...(linkDto['Telegram Photo URL'] && { photo_url: linkDto['Telegram Photo URL'] }),
+      ...(linkDto['Telegram Last Name'] && {
+        last_name: linkDto['Telegram Last Name'],
+      }),
+      ...(linkDto['Telegram Username'] && {
+        username: linkDto['Telegram Username'],
+      }),
+      ...(linkDto['Telegram Photo URL'] && {
+        photo_url: linkDto['Telegram Photo URL'],
+      }),
     };
     // Validate Telegram authorization
     const isTelegramValid = this.profileService.checkTelegramAuthorization(
@@ -146,10 +232,10 @@ export class ProfileController {
     try {
       const userInfo = await this.profileService.findProfileByGC(gcAddress);
 
-      const balances = await this.tokenService.fetchAllowances(
+      const allowances = await this.tokenService.getAllowances(
         userInfo.giveawayWalletAddress,
       );
-      return balances;
+      return allowances;
     } catch (error) {
       console.error(error);
       throw new BadRequestException('Failed to fetch balances');

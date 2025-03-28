@@ -152,7 +152,6 @@ export class GiveawayController {
           `Insuffucient GALA balance in Giveway wallet, need additional ${net.multipliedBy(-1)}`,
         );
       }
-      
 
       const createdGiveaway = await this.giveawayService.createGiveaway(
         publicKey,
@@ -182,7 +181,8 @@ export class GiveawayController {
 
   @Post('estimate-fee')
   estimateFee(@Body() gasFeeDto: GasFeeEstimateRequestDto) {
-    const result = this.giveawayService.getRequiredGalaGasFeeForGiveaway(gasFeeDto);
+    const result =
+      this.giveawayService.getRequiredGalaGasFeeForGiveaway(gasFeeDto);
     return result;
   }
 
@@ -269,18 +269,32 @@ export class GiveawayController {
         );
         if (mintToken.Status?.toString() === '1') {
           claimableWin.claimed = true;
-          return await claimableWin.save();
+          claimableWin.timeClaimed = new Date();
+          await claimableWin.save();
+          return res.status(HttpStatus.OK).json({ 
+            success: true,
+            message: 'Giveaway claimed successfully',
+            claimableWin
+          });
         } else {
           console.error(
             `Unable to mint, here is the dto: ${JSON.stringify(mintToken)}`,
           );
-          return undefined;
+          return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: 'Failed to mint tokens',
+            error: mintToken
+          });
         }
       }
-      res.status(HttpStatus.OK).json({ success: true });
+      return res.status(HttpStatus.BAD_REQUEST).json({ 
+        success: false,
+        message: 'Failed to burn tokens',
+        error: result
+      });
     } catch (error) {
       console.error(error);
-      res
+      return res
         .status(HttpStatus.BAD_REQUEST)
         .json({ success: false, message: 'Failed to claim giveaway', error });
     }
@@ -321,6 +335,10 @@ export class GiveawayController {
       GALA_TOKEN,
     );
 
+    const requiredEscrow = await this.giveawayService.getRequiredEscrow(
+      userInfo.id,
+    );
+
     //todo: account for locks
     const galaBalance = galaBalances.Data.reduce((total, item) => {
       return total.plus(item.quantity);
@@ -338,6 +356,7 @@ export class GiveawayController {
       giveawayWallet: userInfo.giveawayWalletAddress,
       galaNeededForOtherGiveaways,
       availableTokens,
+      requiredEscrow,
     } as const;
   }
 
@@ -418,7 +437,7 @@ export class GiveawayController {
         );
 
       //For the new giveaway
-      const gasForGiveaway = 
+      const gasForGiveaway =
         this.giveawayService.getRequiredGalaGasFeeForGiveaway(giveawayDto);
 
       const requiredGas = escrowGas.plus(gasForGiveaway);

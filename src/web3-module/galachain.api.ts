@@ -14,9 +14,12 @@ import {
   FetchAllowancesDto,
   FetchBalancesDto,
   TokenClassKeyProperties,
+  TokenAllowance,
 } from '@gala-chain/api';
 import { APP_SECRETS } from '../secrets/secrets.module';
 import { TokenInstanceKeyDto } from '../dtos/TokenInstanceKey.dto';
+import { BigNumber } from 'bignumber.js';
+import { combineAllowances } from '../chain.helper';
 
 @Injectable()
 export class GalachainApi implements OnModuleInit {
@@ -41,7 +44,10 @@ export class GalachainApi implements OnModuleInit {
         owner: ownerAddress,
       },
     );
-    return tokenApi.FetchBalances(fetchBalances);
+    const balances = await tokenApi.FetchBalances(fetchBalances);
+    return {
+      Data: balances.Data.filter((token) => token.category === 'Unit'),
+    };
   }
 
   async burnToken(request: BurnTokensRequest, signer?: SigningClient) {
@@ -72,32 +78,29 @@ export class GalachainApi implements OnModuleInit {
     return balances;
   }
 
-  async getAllowancesForToken(
+  async getAllowances(
     ownerAddress: string,
-    tokenClassKey: TokenClassKeyProperties,
+    tokenClassKey?: TokenClassKeyProperties,
   ) {
     const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
     const fetchAllowanceDto = await createValidDTO<FetchAllowancesDto>(
       FetchAllowancesDto,
       {
         grantedTo: ownerAddress,
-        ...tokenClassKey,
-        instance: '0',
+        ...(tokenClassKey && {
+          ...tokenClassKey,
+          instance: '0',
+        }),
       },
     );
     const allowances = await tokenApi.FetchAllowances(fetchAllowanceDto);
-    return allowances;
-  }
+    const allowanceData: TokenAllowance[] =
+      (allowances as any).Data?.results || allowances.Data;
 
-  async fetchAllowances(ownerAddress: string) {
-    const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
-    const fetchAllowanceDto = await createValidDTO<FetchAllowancesDto>(
-      FetchAllowancesDto,
-      {
-        grantedTo: ownerAddress,
-      },
-    );
-    return tokenApi.FetchAllowances(fetchAllowanceDto);
+    if (allowanceData && allowanceData.length === 0) {
+      return [];
+    }
+    return combineAllowances(allowanceData);
   }
 
   async transferToken(dto: TransferTokenRequest, signer?: SigningClient) {

@@ -83,16 +83,12 @@ describe('Giveaway Controller (e2e)', () => {
   const endDateTime = endDate.toISOString();
 
   const startGiveaway = {
+    name: 'Test Giveaway',
     endDateTime,
     telegramAuthRequired: false,
     requireBurnTokenToClaim: false,
     giveawayType: 'DistributedGiveaway',
-    giveawayToken: {
-      additionalKey: 'none',
-      category: 'Unit',
-      collection: 'GALA',
-      type: 'none',
-    },
+    giveawayToken: GALA_TOKEN,
     maxWinners: '1',
     winPerUser: '1',
     prefix: '\u0019Ethereum Signed Message:\n346',

@@ -42,7 +42,6 @@ export class GivewayScheduler {
         giveaway.creator,
       );
       if (!creatorProfile) {
-        // eslint-disable-next-line @typescript-eslint/no-base-to-string
         console.error(
           `Creator profile not found for giveaway: ${giveaway._id as any}`,
         );
@@ -71,6 +70,7 @@ export class GivewayScheduler {
               gcAddress: winner.gcAddress,
               claimed: false, // Initially set to false
               giveawayType: giveaway.giveawayType,
+              timeWon: new Date(),
               // No winningInfo or paymentSent yet
             });
             await winEntry.save();
@@ -100,7 +100,10 @@ export class GivewayScheduler {
           console.log(`Burn Giveaway done!`);
         } else {
           //Mint directly
-          if (giveaway.giveawayTokenType.toString() === GiveawayTokenType.ALLOWANCE.toString()) {
+          if (
+            giveaway.giveawayTokenType.toString() ===
+            GiveawayTokenType.ALLOWANCE.toString()
+          ) {
             const mintResult = await this.galachainApi.batchMintToken(
               {
                 mintDtos: mappedWinners as any,
@@ -120,6 +123,7 @@ export class GivewayScheduler {
 
                 if (winEntry) {
                   winEntry.claimed = true;
+                  winEntry.timeClaimed = new Date();
                   winEntry.winningInfo = JSON.stringify(mintResult);
                   winEntry.paymentSent = new Date();
                   await winEntry.save();
@@ -131,7 +135,10 @@ export class GivewayScheduler {
                 `Giveaway had errors, will retry later. Error: ${(mintResult as any).message}`,
               );
             }
-          } else if (giveaway.giveawayTokenType.toString() === GiveawayTokenType.BALANCE.toString()) {
+          } else if (
+            giveaway.giveawayTokenType.toString() ===
+            GiveawayTokenType.BALANCE.toString()
+          ) {
             const transfers = await Promise.all(
               mappedWinners.map(async (winner) => {
                 try {
@@ -147,7 +154,12 @@ export class GivewayScheduler {
                     giveawayWalletSigner,
                   );
 
-                  return { success: true, result: transferResult };
+                  return {
+                    success: true,
+                    result: transferResult,
+                    owner: winner.owner,
+                    quantity: winner.quantity,
+                  };
                 } catch (error) {
                   return {
                     success: false,
@@ -161,15 +173,8 @@ export class GivewayScheduler {
             for (const transferResult of transfers) {
               let owner: string;
               if (transferResult.success) {
-                if (transferResult.result.Data.length > 1) {
-                  console.error(
-                    'Multiple txs found!!!!',
-                    `${JSON.stringify(transferResult)}`,
-                  );
-                }
-                owner = transferResult.result.Data[0].owner;
-              } else {
                 owner = transferResult.owner;
+
               }
               const index = giveaway.winners.findIndex(
                 (winner) => winner.gcAddress === owner,
@@ -195,11 +200,18 @@ export class GivewayScheduler {
 
                   if (winEntry) {
                     winEntry.claimed = true;
+                    winEntry.timeClaimed = new Date();
                     winEntry.winningInfo = JSON.stringify(
                       transferResult.result,
                     );
+                    winEntry.quantity = transferResult.quantity;
                     winEntry.paymentSent = new Date();
                     await winEntry.save();
+                  } else {
+                    await throwAndLogGiveawayError(
+                      giveaway,
+                      `Unable to find win entry for winner. Winner: ${owner}`,
+                    );
                   }
                 }
               }
@@ -284,7 +296,6 @@ async function handleGiveawayError(
 
   if (giveaway.giveawayErrors.length > 5) {
     giveaway.giveawayStatus = GiveawayStatus.Errored;
-    // eslint-disable-next-line @typescript-eslint/no-base-to-string
     console.error(
       `Giveaway: ${giveaway._id as any} has errored out after ${giveaway.giveawayErrors.length} errors!!!`,
     );

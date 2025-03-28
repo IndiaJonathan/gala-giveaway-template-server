@@ -42,7 +42,10 @@ export class MockGalachainApi implements OnModuleInit {
       usesSpent: number;
       quantity: number;
       quantitySpent: number;
-      tokenClass: TokenClassKeyProperties;
+      collection: string;
+      category: string;
+      type: string;
+      additionalKey: string;
     }>
   > = new Map();
 
@@ -85,7 +88,6 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   transferToken(dto: TransferTokenRequest, signer?: SigningClient) {
     const transferFrom =
       signer?.galaChainAddress || this.adminSigner.galaChainAddress;
@@ -148,7 +150,11 @@ export class MockGalachainApi implements OnModuleInit {
     tokenClassKey: TokenClassKeyProperties,
   ) {
     const tokenAllowances = (this.allowances[ownerAddress] || []).filter(
-      (allowance) => checkTokenEquality(allowance.tokenClass, tokenClassKey),
+      (allowance) =>
+        checkTokenEquality(allowance, {
+          ...tokenClassKey,
+          instance: new BigNumber(0),
+        }),
     );
     return {
       success: true,
@@ -160,16 +166,22 @@ export class MockGalachainApi implements OnModuleInit {
     ownerAddress: string,
     tokenClassKey: TokenClassKeyProperties,
   ) {
-    const allowances = this.getAllowancesForToken(
-      ownerAddress,
-      tokenClassKey,
-    );
+    const allowances = this.getAllowancesForToken(ownerAddress, tokenClassKey);
 
-    const totalQuantity = allowances.Data.filter(
-      (allowance) => allowance.tokenClass === tokenClassKey,
+    const totalQuantity = allowances.Data.filter((allowance) =>
+      checkTokenEquality(allowance, {
+        ...tokenClassKey,
+        instance: new BigNumber(0),
+      }),
     ).reduce((sum, allowance) => sum + allowance.quantity, 0);
 
     return totalQuantity;
+  }
+
+  getAllowances(ownerAddress: string, tokenClassKey: TokenClassKeyProperties) {
+    const allowances = this.getAllowancesForToken(ownerAddress, tokenClassKey);
+
+    return allowances.Data;
   }
 
   //TEST ONLY
@@ -190,7 +202,10 @@ export class MockGalachainApi implements OnModuleInit {
       uses: amount,
       quantitySpent: 0,
       usesSpent: 0,
-      tokenClass,
+      collection: tokenClass.collection,
+      category: tokenClass.category,
+      type: tokenClass.type,
+      additionalKey: tokenClass.additionalKey,
     });
   }
 
@@ -278,7 +293,10 @@ export class MockGalachainApi implements OnModuleInit {
     const totalQuantity =
       this.allowances[user]
         ?.filter((allowance) =>
-          checkTokenEquality(allowance.tokenClass, tokenClassKey),
+          checkTokenEquality(allowance, {
+            ...tokenClassKey,
+            instance: new BigNumber(0),
+          }),
         )
         // ?.filter((allowance) => allowance.tokenClass === tokenClassKey)
         .reduce(
@@ -293,7 +311,10 @@ export class MockGalachainApi implements OnModuleInit {
 
     this.allowances[user].forEach((allowance) => {
       if (
-        checkTokenEquality(allowance.tokenClass, tokenClassKey) &&
+        checkTokenEquality(allowance, {
+          ...tokenClassKey,
+          instance: new BigNumber(0),
+        }) &&
         amount > 0
       ) {
         const availableQuantity = allowance.quantity - allowance.quantitySpent;

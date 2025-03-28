@@ -11,6 +11,9 @@ export interface WinDocument extends Document {
   winningInfo: string;
   paymentSent: Date;
   giveawayType: string; // 'FirstComeFirstServe' or 'DistributedGiveaway'
+  timeWon: Date;
+  timeClaimed?: Date;
+  quantity: string;
 }
 
 export const WinSchema = new Schema<WinDocument>({
@@ -23,6 +26,8 @@ export const WinSchema = new Schema<WinDocument>({
   winningInfo: { type: String, required: false },
   paymentSent: { type: Date, required: false },
   giveawayType: { type: String, required: true },
+  timeWon: { type: Date, default: Date.now, required: true },
+  timeClaimed: { type: Date, required: false },
 });
 
 export const Win = model<WinDocument>('Win', WinSchema);

@@ -3,51 +3,39 @@ import { TokenAllowance, TokenClassKeyProperties } from '@gala-chain/api';
 import BigNumber from 'bignumber.js';
 import { GalachainApi } from '../web3-module/galachain.api';
 import { TokenBalance } from '@gala-chain/connect';
+import { combineAllowances } from '../chain.helper';
 
 @Injectable()
 export class WalletService {
   constructor(@Inject(GalachainApi) private galachainApi: GalachainApi) {}
 
+  async getAllAllowances(giveawayWalletAddress: string) {
+    const allowances = await this.galachainApi.getAllowances(
+      giveawayWalletAddress,
+    );
+
+    return allowances;
+  }
   async getAllowanceQuantity(
     giveawayWalletAddress: string,
     tokenClassKey: TokenClassKeyProperties,
   ) {
-    const allowances = await this.galachainApi.getAllowancesForToken(
+    const allowances = await this.galachainApi.getAllowances(
       giveawayWalletAddress,
       tokenClassKey,
     );
 
-    let totalQuantity = BigNumber(0);
-    let unusableQuantity = BigNumber(0);
-    if ((allowances as any).Data) {
-      //Seems like local wants results, but stage/prod don't
-      //TODO: look into this
-      const allowanceData =
-        (allowances as any).Data?.results || allowances.Data;
-      (allowanceData as TokenAllowance[]).forEach((tokenAllowance) => {
-        const quantityAvailable = BigNumber(tokenAllowance.quantity).minus(
-          BigNumber(tokenAllowance.quantitySpent),
-        );
-        const usesAvailable = BigNumber(tokenAllowance.uses).minus(
-          BigNumber(tokenAllowance.usesSpent),
-        );
-
-        if (usesAvailable < quantityAvailable) {
-          //Handling it this way to ensure that the available quantity can work with available uses
-          totalQuantity = totalQuantity.plus(usesAvailable);
-
-          unusableQuantity = unusableQuantity.plus(
-            quantityAvailable.minus(usesAvailable),
-          );
-
-          //TODO: Handle the full quantity if possible
-        } else {
-          totalQuantity = totalQuantity.plus(quantityAvailable);
-        }
-      });
+    const allowance = allowances.find(
+      (allowance) =>
+        allowance.collection === tokenClassKey.collection &&
+        allowance.category === tokenClassKey.category &&
+        allowance.type === tokenClassKey.type &&
+        allowance.additionalKey === tokenClassKey.additionalKey,
+    );
+    if (!allowance) {
+      return BigNumber(0);
     }
-
-    return totalQuantity;
+    return allowance.quantity;
   }
 
   async getBalanceQuantity(

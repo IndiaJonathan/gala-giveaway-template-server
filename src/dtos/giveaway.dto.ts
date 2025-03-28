@@ -16,6 +16,10 @@ export enum GiveawayTokenType {
 // Base DTO for shared properties
 export class BasicGiveawaySettingsDto {
   @IsNotEmpty()
+  @IsString()
+  name: string;
+
+  @IsNotEmpty()
   giveawayToken: any;
 
   @IsOptional()

@@ -2,6 +2,7 @@ import { TokenClassKeyProperties } from '@gala-chain/api';
 import { Schema, Document } from 'mongoose';
 import { ObjectId } from 'mongodb';
 import { GiveawayTokenType } from '../dtos/giveaway.dto';
+import BigNumber from 'bignumber.js';
 
 export enum GiveawayStatus {
   Created = 'created',
@@ -19,9 +20,12 @@ export interface Winner {
 }
 
 export interface GiveawayDocument extends Document {
+  name: string;
   endDateTime: Date;
   giveawayType: 'FirstComeFirstServe' | 'DistributedGiveaway';
-  giveawayToken: TokenClassKeyProperties;
+  giveawayToken: TokenClassKeyProperties & {
+    instance: BigNumber;
+  };
   winPerUser: string;
   winners: Winner[];
   maxWinners: number;
@@ -32,7 +36,9 @@ export interface GiveawayDocument extends Document {
   giveawayErrors: string[];
   requireBurnTokenToClaim: boolean;
   burnTokenQuantity?: string;
-  burnToken?: TokenClassKeyProperties;
+  burnToken?: TokenClassKeyProperties & {
+    instance: BigNumber;
+  };
   giveawayTokenType: GiveawayTokenType;
 }
 
@@ -44,6 +50,7 @@ const WinnerSchema = new Schema<Winner>({
 });
 
 export const GiveawaySchema = new Schema<GiveawayDocument>({
+  name: { type: String, required: true },
   giveawayType: {
     type: String,
     required: true,

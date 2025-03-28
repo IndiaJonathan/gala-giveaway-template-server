@@ -78,6 +78,7 @@ describe('Giveaway Controller (e2e)', () => {
   const endDateTime = endDate.toISOString();
 
   const startGiveaway = {
+    name: 'Test Allowance Giveaway',
     endDateTime,
     telegramAuthRequired: false,
     requireBurnTokenToClaim: false,
