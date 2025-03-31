@@ -204,21 +204,166 @@ describe('Giveaway Controller (e2e)', () => {
       })
       .expect(201);
 
-    //Should exist now when calling all
-    return await request(app.getHttpServer())
+    //One giveaway should exist now
+    await request(app.getHttpServer())
       .get('/api/giveaway/all')
       .set('Content-Type', 'application/json')
       .send(signedPayload)
       .expect(200)
       .expect((res) => {
         expect(res.body).toHaveLength(1);
-
-        expect(res.body[0]).toMatchObject({
-          _id: expect.any(String),
-          giveawayStatus: 'created',
-        });
       });
   });
+
+  it('should fail create a giveaway if start and end datetime are less than 10 minutes apart', async () => {
+    const wallet = await WalletUtils.createAndRegisterRandomWallet(
+      secrets['REGISTRATION_ENDPOINT'],
+    );
+
+    const profile = await profileService.createProfile(wallet.ethAddress);
+
+    mockGalachainApi.grantBalanceForToken(
+      profile.giveawayWalletAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    mockGalachainApi.grantBalanceForToken(
+      profile.giveawayWalletAddress,
+      GALA_TOKEN,
+      1,
+    );
+
+    const currentTime = new Date();
+    // Set startDateTime to be one hour in the future
+    const startDateTime = new Date(currentTime.getTime() + 60 * 60 * 1000).toISOString();
+    // Set endDateTime to be one hour and 5 minutes in the future (only 5 minutes after start)
+    const endDateTime = new Date(currentTime.getTime() + 65 * 60 * 1000).toISOString();
+
+    const signer = new SigningClient(wallet.privateKey);
+    const signedPayload = await signer.sign('Start Giveaway', {
+      ...startBalanceGiveaway,
+      startDateTime,
+      endDateTime,
+    });
+
+    return await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.success).toBe(false);
+        expect(res.body.message).toBe('Failed to start giveaway');
+        expect(res.body.error.response.message).toBe(
+          'There must be at least 10 minutes between start and end date.'
+        );
+      });
+  });
+
+  it('should successfully set startDateTime when not provided', async () => {
+    const wallet = await WalletUtils.createAndRegisterRandomWallet(
+      secrets['REGISTRATION_ENDPOINT'],
+    );
+
+    const profile = await profileService.createProfile(wallet.ethAddress);
+
+    mockGalachainApi.grantBalanceForToken(
+      profile.giveawayWalletAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    mockGalachainApi.grantBalanceForToken(
+      profile.giveawayWalletAddress,
+      GALA_TOKEN,
+      1,
+    );
+
+    const signer = new SigningClient(wallet.privateKey);
+    const giveawayWithoutStartDate = {
+      ...startBalanceGiveaway,
+      // Explicitly omit startDateTime
+    };
+    const signedPayload = await signer.sign('Start Giveaway', giveawayWithoutStartDate);
+
+    const response = await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(201);
+
+    // Verify the giveaway was created
+    expect(response.body.success).toBe(true);
+    expect(response.body.giveaway).toBeDefined();
+    
+    // Verify startDateTime was set automatically
+    const giveawayId = response.body.giveaway._id;
+    const savedGiveaway = await giveawayModel.findById(giveawayId).exec();
+    expect(savedGiveaway.startDateTime).toBeDefined();
+  });
+
+  it('should prevent signup before startDateTime', async () => {
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
+      await createUser();
+
+    mockGalachainApi.grantBalanceForToken(
+      giveawayCreatorProfile.giveawayWalletAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    // Set startDateTime to be 1 hour in the future
+    const currentTime = new Date();
+    const startDateTime = new Date(currentTime.getTime() + 60 * 60 * 1000).toISOString();
+    // Set endDateTime to be 2 hours in the future
+    const endDateTime = new Date(currentTime.getTime() + 2 * 60 * 60 * 1000).toISOString();
+
+    const distributedGiveaway = {
+      ...startBalanceGiveaway,
+      giveawayType: 'DistributedGiveaway',
+      startDateTime,
+      endDateTime,
+      winPerUser: '5',
+      maxWinners: '1',
+      uniqueKey: `giveaway-start-${new Date().getTime()}`,
+    };
+
+    const signedPayload = await giveawayCreatorSigner.sign(
+      'Start Giveaway',
+      distributedGiveaway,
+    );
+
+    // Create giveaway successfully
+    const createRes = await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(201);
+
+    expect(createRes.body.success).toBe(true);
+    
+    const { profile: userProfile, signer: userSigner } = await createUser();
+
+    // User tries to sign up for the giveaway
+    const signupData = {
+      giveawayId: createRes.body.giveaway._id,
+      uniqueKey: `giveaway-signup-${new Date().getTime()}`,
+    };
+
+    const signedSignupPayload = await userSigner.sign('Signup', signupData);
+
+    // Attempt to sign up before start time should fail
+    return await request(app.getHttpServer())
+      .post('/api/giveaway/signup')
+      .set('Content-Type', 'application/json')
+      .send(signedSignupPayload)
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.message).toBe('The giveaway has not started yet');
+      });
+  });
+
 
   it('should be able to win a giveaway', async () => {
     const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =

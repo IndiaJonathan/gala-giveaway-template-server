@@ -9,6 +9,8 @@ import {
   IsNumber,
   IsEnum,
 } from 'class-validator';
+import { NoBadWords } from '../validators/no-bad-words.validator';
+
 export enum GiveawayTokenType {
   BALANCE = 'Balance',
   ALLOWANCE = 'Allowance',
@@ -17,10 +19,18 @@ export enum GiveawayTokenType {
 export class BasicGiveawaySettingsDto {
   @IsNotEmpty()
   @IsString()
+  @NoBadWords({ message: 'Giveaway name contains inappropriate language' })
   name: string;
 
   @IsNotEmpty()
   giveawayToken: any;
+
+  @IsOptional()
+  @Validate((value: string) => !isNaN(Date.parse(value)), {
+    message: 'startDateTime must be a valid ISO 8601 date string',
+  })
+  @IsString()
+  startDateTime?: string;
 
   @IsOptional()
   @Validate((value: string) => !isNaN(Date.parse(value)), {

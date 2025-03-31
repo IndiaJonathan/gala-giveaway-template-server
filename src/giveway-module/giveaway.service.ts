@@ -383,6 +383,11 @@ export class GiveawayService {
       throw new BadRequestException('The giveaway has ended, sorry');
     }
 
+    // Check if the giveaway has a startDateTime and it hasn't started yet
+    if (giveaway.startDateTime && new Date(giveaway.startDateTime) > new Date()) {
+      throw new BadRequestException('The giveaway has not started yet');
+    }
+
     if (giveaway.telegramAuthRequired) {
       const getProfile = await this.profileService.findProfileByGC(
         checksumGCAddress(gcAddress),

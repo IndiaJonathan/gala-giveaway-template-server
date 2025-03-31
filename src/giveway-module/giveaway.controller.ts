@@ -46,13 +46,21 @@ export class GiveawayController {
 
   @Post('start')
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  async startGiveaway(@Body() giveawayDto: GiveawayDto, @Res() res: Response) {
+  async startGiveaway(
+    @Body() giveawayDto: GiveawayDto,
+    @Res() res: Response,
+  ) {
     try {
       const publicKey = signatures.recoverPublicKey(
         giveawayDto.signature,
         giveawayDto,
         '',
       );
+      
+      // Set startDateTime to now if it's empty
+      if (!giveawayDto.startDateTime) {
+        giveawayDto.startDateTime = new Date().toISOString();
+      }
 
       if (giveawayDto.endDateTime) {
         const currentTime = new Date();
@@ -61,6 +69,17 @@ export class GiveawayController {
         if (new Date(giveawayDto.endDateTime) <= oneHourFromNow) {
           throw new BadRequestException(
             'The endDateTime must be at least one hour in the future.',
+          );
+        }
+
+        // Add validation to ensure at least 10 minutes between start and end date
+        const startDate = new Date(giveawayDto.startDateTime);
+        const endDate = new Date(giveawayDto.endDateTime);
+        const tenMinutesInMs = 10 * 60 * 1000;
+        
+        if (endDate.getTime() - startDate.getTime() < tenMinutesInMs) {
+          throw new BadRequestException(
+            'There must be at least 10 minutes between start and end date.',
           );
         }
       }
