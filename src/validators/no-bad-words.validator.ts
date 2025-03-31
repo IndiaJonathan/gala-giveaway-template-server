@@ -7,7 +7,7 @@ import { profanity } from '@2toad/profanity';
  * @returns PropertyDecorator
  */
 export function NoBadWords(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'noBadWords',
       target: object.constructor,
