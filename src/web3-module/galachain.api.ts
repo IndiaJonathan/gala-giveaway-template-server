@@ -132,7 +132,7 @@ export class GalachainApi implements OnModuleInit {
       };
     } catch (e) {
       if (e.Error) {
-        if (e.Error && e.Error.ErrorKey === 'OBJECT_NOT_FOUND') {
+        if (e.Error === 'OBJECT_NOT_FOUND' || e.ErrorKey === 'OBJECT_NOT_FOUND') {
           return {
             exists: false,
           };

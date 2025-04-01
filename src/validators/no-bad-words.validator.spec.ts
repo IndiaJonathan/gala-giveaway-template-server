@@ -49,4 +49,12 @@ describe('NoBadWords Validator', () => {
     expect(errors[0].constraints).toHaveProperty('noBadWords');
     expect(errors[0].constraints.noBadWords).toBe('Inappropriate name detected!');
   });
+
+  it('should detect uppercase compound profanity', async () => {
+    const instance = new TestClass('FUCKFUCK');
+    const errors = await validate(instance);
+    expect(errors.length).toBe(1);
+    expect(errors[0].constraints).toHaveProperty('noBadWords');
+    expect(errors[0].property).toBe('name');
+  });
 }); 

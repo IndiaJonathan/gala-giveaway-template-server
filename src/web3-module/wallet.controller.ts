@@ -28,7 +28,7 @@ export class WalletController {
 
     const registerWallet = await WalletUtils.registerWallet(
       registrationEndpoint,
-      publicKey,
+      '0x' + publicKey,
     );
     return registerWallet;
   }
