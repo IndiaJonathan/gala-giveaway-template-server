@@ -199,7 +199,7 @@ export class ProfileService {
       }
     } catch (e) {
       if (e instanceof GalaChainResponseError) {
-        if (e.ErrorCode === 400) {
+        if (e.ErrorCode === 400 || (e as any).Error && (e as any).Error.ErrorCode === 404) {
           //Not signed up, sign up
           const registerWallet = await WalletUtils.registerWallet(
             registrationEndpoint,

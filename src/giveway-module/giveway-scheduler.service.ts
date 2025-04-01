@@ -64,16 +64,23 @@ export class GivewayScheduler {
         // But skip for giveaways that require burn tokens to claim, as those will be created later
         if (winners.length > 0 && !giveaway.requireBurnTokenToClaim) {
           for (const winner of winners) {
-            const winEntry = new this.winModel({
-              giveaway: giveaway.id,
-              amountWon: winner.winAmount,
-              gcAddress: winner.gcAddress,
-              claimed: false, // Initially set to false
-              giveawayType: giveaway.giveawayType,
-              timeWon: new Date(),
-              // No winningInfo or paymentSent yet
-            });
-            await winEntry.save();
+            await this.winModel.findOneAndUpdate(
+              {
+                giveaway: giveaway.id,
+                gcAddress: winner.gcAddress
+              },
+              {
+                $setOnInsert: {
+                  giveaway: giveaway.id,
+                  amountWon: winner.winAmount,
+                  gcAddress: winner.gcAddress,
+                  claimed: false,
+                  giveawayType: giveaway.giveawayType,
+                  timeWon: new Date(),
+                }
+              },
+              { upsert: true, new: true }
+            );
           }
         }
       }
@@ -116,18 +123,28 @@ export class GivewayScheduler {
 
               // Update existing win entries for each winner
               for (const winner of winners) {
-                const winEntry = await this.winModel.findOne({
-                  giveaway: giveaway.id,
-                  gcAddress: winner.gcAddress,
-                });
-
-                if (winEntry) {
-                  winEntry.claimed = true;
-                  winEntry.timeClaimed = new Date();
-                  winEntry.winningInfo = JSON.stringify(mintResult);
-                  winEntry.paymentSent = new Date();
-                  await winEntry.save();
-                }
+                await this.winModel.findOneAndUpdate(
+                  {
+                    giveaway: giveaway.id,
+                    gcAddress: winner.gcAddress
+                  },
+                  {
+                    $set: {
+                      claimed: true,
+                      timeClaimed: new Date(),
+                      winningInfo: JSON.stringify(mintResult),
+                      paymentSent: new Date(),
+                    },
+                    $setOnInsert: {
+                      giveaway: giveaway.id,
+                      amountWon: winner.winAmount,
+                      gcAddress: winner.gcAddress,
+                      giveawayType: giveaway.giveawayType,
+                      timeWon: new Date(),
+                    }
+                  },
+                  { upsert: true, new: true }
+                );
               }
             } else {
               giveaway.giveawayErrors.push((mintResult as any).message);
@@ -193,26 +210,29 @@ export class GivewayScheduler {
 
                 // Update existing win entry after successful transfer
                 if (transferResult.success) {
-                  const winEntry = await this.winModel.findOne({
-                    giveaway: giveaway.id,
-                    gcAddress: owner,
-                  });
-
-                  if (winEntry) {
-                    winEntry.claimed = true;
-                    winEntry.timeClaimed = new Date();
-                    winEntry.winningInfo = JSON.stringify(
-                      transferResult.result,
-                    );
-                    winEntry.quantity = transferResult.quantity;
-                    winEntry.paymentSent = new Date();
-                    await winEntry.save();
-                  } else {
-                    await throwAndLogGiveawayError(
-                      giveaway,
-                      `Unable to find win entry for winner. Winner: ${owner}`,
-                    );
-                  }
+                  await this.winModel.findOneAndUpdate(
+                    {
+                      giveaway: giveaway.id,
+                      gcAddress: owner,
+                    },
+                    {
+                      $set: {
+                        claimed: true,
+                        timeClaimed: new Date(),
+                        winningInfo: JSON.stringify(transferResult.result),
+                        quantity: transferResult.quantity,
+                        paymentSent: new Date(),
+                      },
+                      $setOnInsert: {
+                        giveaway: giveaway.id,
+                        amountWon: giveaway.winPerUser,
+                        gcAddress: owner,
+                        giveawayType: giveaway.giveawayType,
+                        timeWon: new Date(),
+                      }
+                    },
+                    { upsert: true, new: true }
+                  );
                 }
               }
             }

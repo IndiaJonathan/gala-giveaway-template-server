@@ -30,6 +30,10 @@ export class WalletController {
       registrationEndpoint,
       '0x' + publicKey,
     );
+    const registerWallet2 = await WalletUtils.registerWallet(
+      registrationEndpoint,
+      publicKey,
+    );
     return registerWallet;
   }
 
