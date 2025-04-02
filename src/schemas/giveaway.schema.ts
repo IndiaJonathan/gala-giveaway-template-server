@@ -22,7 +22,7 @@ export interface Winner {
 export interface GiveawayDocument extends Document {
   name: string;
   startDateTime?: Date;
-  endDateTime: Date;
+  endDateTime?: Date;
   giveawayType: 'FirstComeFirstServe' | 'DistributedGiveaway';
   giveawayToken: TokenClassKeyProperties & {
     instance: BigNumber;
@@ -58,7 +58,7 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
     enum: ['FirstComeFirstServe', 'DistributedGiveaway'],
   },
   startDateTime: { type: Date, required: false, default: Date.now },
-  endDateTime: { type: Date, required: true },
+  endDateTime: { type: Date, required: false },
   telegramAuthRequired: { type: Boolean, required: false, default: false },
   giveawayToken: {
     collection: { type: String, required: true },
