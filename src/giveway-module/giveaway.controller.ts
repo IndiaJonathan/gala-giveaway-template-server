@@ -225,7 +225,7 @@ export class GiveawayController {
   }
 
   @Post('fcfs/claim')
-  async claimFCFS(@Body() giveawayDto: ClaimFCFSRequestDTO) {
+  async claimFCFS(@Body() giveawayDto: any) {
     const gc_address = validateSignature(giveawayDto);
     const winEntry = await this.giveawayService.claimFCFS(
       giveawayDto,

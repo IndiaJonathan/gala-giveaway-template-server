@@ -510,6 +510,9 @@ export class GiveawayService {
 
     if (giveaway.burnToken) {
       this.runBurnChecks(giveaway, claimDto.tokenInstances);
+      // claimDto.tokenInstances.forEach((tokenInstance) => {
+      //   tokenInstance.quantity = tokenInstance.tokenInstanceKey.replace('eth|', '0x');
+      // });
 
       const result = await this.galachainApi.burnToken(claimDto);
       console.log(result);
