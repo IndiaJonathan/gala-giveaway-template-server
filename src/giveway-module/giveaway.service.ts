@@ -56,6 +56,8 @@ export class GiveawayService {
   async createGiveaway(
     publicKey: string,
     giveawayDto: GiveawayDto,
+    tokenImage: string,
+    burnTokenImage?: string,
   ): Promise<GiveawayDocument> {
     const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
 
@@ -63,6 +65,16 @@ export class GiveawayService {
 
     const newGiveaway = new this.giveawayModel({
       ...giveawayDto,
+      giveawayToken: {
+        image: tokenImage,
+        ...giveawayDto.giveawayToken,
+      },
+      ...(giveawayDto.burnToken && {
+        burnToken: {
+          image: burnTokenImage,
+          ...giveawayDto.burnToken,
+        },
+      }),
       creator: account,
     });
 
@@ -384,7 +396,10 @@ export class GiveawayService {
     }
 
     // Check if the giveaway has a startDateTime and it hasn't started yet
-    if (giveaway.startDateTime && new Date(giveaway.startDateTime) > new Date()) {
+    if (
+      giveaway.startDateTime &&
+      new Date(giveaway.startDateTime) > new Date()
+    ) {
       throw new BadRequestException('The giveaway has not started yet');
     }
 

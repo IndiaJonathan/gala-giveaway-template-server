@@ -284,6 +284,18 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
+  async getTokenMetadata(tokenClassKeys: TokenInstanceKeyDto[]) {
+    const tokenData = tokenClassKeys.map(token => ({
+      ...token,
+      image: 'shrek.png',
+    }));
+
+    return {
+      Status: 1,
+      Data: tokenData,
+    };
+  }
+
   //TEST ONLY
   deductAllowance(
     tokenClassKey: TokenClassKeyProperties,

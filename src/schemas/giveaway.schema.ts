@@ -65,6 +65,7 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
     type: { type: String, required: true },
     category: { type: String, required: true },
     additionalKey: { type: String, required: true },
+    image: { type: String, required: true },
   },
   giveawayErrors: { type: [String], default: [] },
 
@@ -121,6 +122,7 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
       type: { type: String, required: true },
       category: { type: String, required: true },
       additionalKey: { type: String, required: true },
+      image: { type: String, required: true },
     }),
     required: function (this: GiveawayDocument) {
       return this.requireBurnTokenToClaim === true;

@@ -154,4 +154,11 @@ export class GalachainApi implements OnModuleInit {
   async createRandomWallet(registrationEndpoint: string) {
     return WalletUtils.createAndRegisterRandomWallet(registrationEndpoint);
   }
+
+  async getTokenMetadata(tokenClassKeys: TokenInstanceKeyDto[]) {
+    const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
+    return tokenApi.FetchTokenClasses({
+      tokenClasses: tokenClassKeys,
+    });
+  }
 }

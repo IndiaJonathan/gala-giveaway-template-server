@@ -46,17 +46,14 @@ export class GiveawayController {
 
   @Post('start')
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  async startGiveaway(
-    @Body() giveawayDto: GiveawayDto,
-    @Res() res: Response,
-  ) {
+  async startGiveaway(@Body() giveawayDto: GiveawayDto, @Res() res: Response) {
     try {
       const publicKey = signatures.recoverPublicKey(
         giveawayDto.signature,
         giveawayDto,
         '',
       );
-      
+
       // Set startDateTime to now if it's empty
       if (!giveawayDto.startDateTime) {
         giveawayDto.startDateTime = new Date().toISOString();
@@ -76,7 +73,7 @@ export class GiveawayController {
         const startDate = new Date(giveawayDto.startDateTime);
         const endDate = new Date(giveawayDto.endDateTime);
         const tenMinutesInMs = 10 * 60 * 1000;
-        
+
         if (endDate.getTime() - startDate.getTime() < tenMinutesInMs) {
           throw new BadRequestException(
             'There must be at least 10 minutes between start and end date.',
@@ -172,9 +169,29 @@ export class GiveawayController {
         );
       }
 
+      const tokens = [giveawayDto.giveawayToken];
+      if (giveawayDto.burnToken) {
+        tokens.push(giveawayDto.burnToken);
+      }
+
+      const tokenMetadata = await this.tokenService.getTokenMetadata(tokens);
+
+      const image = tokenMetadata.Data.find((token) =>
+        checkTokenEquality(token, giveawayDto.giveawayToken),
+      )?.image;
+
+      let burnTokenImage = undefined;
+      if (giveawayDto.burnToken) {
+        burnTokenImage = tokenMetadata.Data.find((token) =>
+          checkTokenEquality(token, giveawayDto.burnToken),
+        )?.image;
+      }
+
       const createdGiveaway = await this.giveawayService.createGiveaway(
         publicKey,
         giveawayDto,
+        image,
+        burnTokenImage,
       );
       res
         .status(HttpStatus.CREATED)
@@ -290,10 +307,10 @@ export class GiveawayController {
           claimableWin.claimed = true;
           claimableWin.timeClaimed = new Date();
           await claimableWin.save();
-          return res.status(HttpStatus.OK).json({ 
+          return res.status(HttpStatus.OK).json({
             success: true,
             message: 'Giveaway claimed successfully',
-            claimableWin
+            claimableWin,
           });
         } else {
           console.error(
@@ -302,14 +319,14 @@ export class GiveawayController {
           return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
             success: false,
             message: 'Failed to mint tokens',
-            error: mintToken
+            error: mintToken,
           });
         }
       }
-      return res.status(HttpStatus.BAD_REQUEST).json({ 
+      return res.status(HttpStatus.BAD_REQUEST).json({
         success: false,
         message: 'Failed to burn tokens',
-        error: result
+        error: result,
       });
     } catch (error) {
       console.error(error);
