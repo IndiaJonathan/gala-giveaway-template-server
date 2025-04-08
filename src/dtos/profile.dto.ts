@@ -1,6 +1,12 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, Matches } from 'class-validator';
 import { SignedPayloadBaseDto } from './SignedPayloadBase.dto';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class UnlinkDto extends SignedPayloadBaseDto {
+  @IsString()
+  @Matches(/^unlink-telegram.*/)
+  uniqueKey: string;
+}
 
 export class LinkDto extends SignedPayloadBaseDto {
   @IsString()

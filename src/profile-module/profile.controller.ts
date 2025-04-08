@@ -19,9 +19,10 @@ import { GalachainApi } from '../web3-module/galachain.api';
 import { isAddress } from 'ethers';
 import { validateSignature } from '../utils/web3wallet';
 import { filterGiveawaysData } from '../utils/giveaway-utils';
-import { LinkDto } from '../dtos/profile.dto';
+import { LinkDto, UnlinkDto } from '../dtos/profile.dto';
 import { TokenBalance } from '@gala-chain/connect';
 import { tokenToReadable } from '../chain.helper';
+import { SignedPayloadBaseDto } from '../dtos/SignedPayloadBase.dto';
 
 @Controller('api/profile')
 export class ProfileController {
@@ -73,23 +74,23 @@ export class ProfileController {
     const requiredEscrow = await this.giveawayService.getRequiredEscrow(
       userInfo.id,
     );
-    
 
-    const escrowAllowances = await this.tokenService.getAllowances(userInfo.giveawayWalletAddress); 
+    const escrowAllowances = await this.tokenService.getAllowances(
+      userInfo.giveawayWalletAddress,
+    );
 
     // Combine balances and subtract escrow
     const combinedBalances = {};
-    
+
     // Helper function to safely parse quantity
-    const parseQuantity = (quantity) => 
+    const parseQuantity = (quantity) =>
       quantity ? parseInt(quantity.toString()) : 0;
-    
+
     // Helper function to add balance to combined map
     const addBalance = (balance: TokenBalance) => {
-      
       const tokenId = tokenToReadable(balance);
       const quantity = parseQuantity(balance.quantity);
-      
+
       if (combinedBalances[tokenId]) {
         combinedBalances[tokenId].quantity += quantity;
       } else {
@@ -103,23 +104,30 @@ export class ProfileController {
         };
       }
     };
-    
+
     // Process user and giveaway balances
-    if (userBalances && userBalances.Data &&Array.isArray(userBalances.Data)) {
+    if (userBalances && userBalances.Data && Array.isArray(userBalances.Data)) {
       userBalances.Data.forEach(addBalance);
     }
-    
-    if (giveawayWalletBalances && giveawayWalletBalances.Data && Array.isArray(giveawayWalletBalances.Data)) {
+
+    if (
+      giveawayWalletBalances &&
+      giveawayWalletBalances.Data &&
+      Array.isArray(giveawayWalletBalances.Data)
+    ) {
       giveawayWalletBalances.Data.forEach(addBalance);
     }
-    
+
     // Subtract required escrow amounts
-    if (requiredEscrow && Array.isArray(requiredEscrow)) {
-      requiredEscrow.forEach(escrow => {
+    if (
+      requiredEscrow &&
+      Array.isArray(requiredEscrow.balanceEscrowRequirements)
+    ) {
+      requiredEscrow.balanceEscrowRequirements.forEach((escrow) => {
         if (escrow && escrow.quantity) {
           const tokenId = tokenToReadable(escrow);
           const escrowQuantity = parseQuantity(escrow.quantity);
-          
+
           if (combinedBalances[tokenId]) {
             combinedBalances[tokenId].quantity -= escrowQuantity;
             combinedBalances[tokenId].escrowAmount = escrowQuantity;
@@ -208,6 +216,53 @@ export class ProfileController {
         success: false,
         message: 'Invalid authentication data',
       });
+    }
+  }
+
+  @Post('unlink-accounts')
+  async unlinkAccounts(@Body() unlinkDto: UnlinkDto) {
+    try {
+      // Validate the signature and get the GalaChain address
+      const gcAddress = validateSignature(unlinkDto);
+      if (!gcAddress) {
+        throw new UnauthorizedException('Invalid signature');
+      }
+
+      // Find the profile by GalaChain address
+      const profile = await this.profileService.findProfileByGC(gcAddress);
+      if (!profile) {
+        throw new NotFoundException(`Profile with GalaChain address ${gcAddress} not found`);
+      }
+
+      // Check if profile has Telegram data
+      if (!profile.telegramId) {
+        throw new BadRequestException('No Telegram account linked to this profile');
+      }
+
+      // Remove Telegram data
+      profile.telegramId = null;
+      profile.firstName = null;
+      profile.lastName = null;
+      
+      // Save the updated profile
+      await profile.save();
+
+      return {
+        success: true,
+        message: 'Telegram account unlinked successfully',
+        gcAddress: profile.galaChainAddress
+      };
+    } catch (error) {
+      console.error('Error unlinking accounts:', error);
+      if (error instanceof UnauthorizedException || 
+          error instanceof NotFoundException || 
+          error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new HttpException(
+        { success: false, message: `Failed to unlink accounts: ${error.message}` },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 
