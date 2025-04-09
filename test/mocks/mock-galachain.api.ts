@@ -284,6 +284,12 @@ export class MockGalachainApi implements OnModuleInit {
     };
   }
 
+
+  getAlias(address: string) {
+    return this.isRegistered(address);
+  }
+  
+
   getTokenMetadata(tokenClassKeys: TokenInstanceKeyDto[]) {
     const tokenData = tokenClassKeys.map(token => ({
       ...token,
