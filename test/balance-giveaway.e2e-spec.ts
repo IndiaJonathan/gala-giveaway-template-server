@@ -1551,64 +1551,6 @@ describe('Giveaway Controller (e2e)', () => {
     expect(winEntries[0].claimed).toBe(true);
   });
 
-  it('should correctly return GALA balance in tokens-available endpoint', async () => {
-    // 1. Create a user to test with
-    const { profile, signer } = await createUser();
-
-    // 2. Grant different amounts of tokens to the giveaway wallet
-    const testToken = {
-      additionalKey: 'none',
-      category: 'Unit',
-      collection: 'TEST_TOKEN',
-      type: 'none',
-      instance: '0',
-    };
-
-    // Grant 10 TEST_TOKEN
-    mockGalachainApi.grantBalanceForToken(
-      profile.giveawayWalletAddress,
-      testToken,
-      10,
-    );
-
-    // Grant 5 GALA token
-    mockGalachainApi.grantBalanceForToken(
-      profile.giveawayWalletAddress,
-      GALA_TOKEN,
-      5,
-    );
-
-    // 3. Prepare the request with the TEST_TOKEN instance key
-    const requestDto = {
-      tokenInstanceKey: testToken,
-      tokenType: GiveawayTokenType.BALANCE,
-    };
-
-    // Sign the payload (though signature isn't checked for this endpoint)
-    const signedPayload = await signer.sign('Get Tokens Available', requestDto);
-
-    // 4. Call the tokens-available endpoint
-    const response = await request(app.getHttpServer())
-      .post(`/api/giveaway/tokens-available/${profile.galaChainAddress}`)
-      .set('Content-Type', 'application/json')
-      .send(signedPayload)
-      .expect((res) => {
-        console.log(res.body);
-      })
-      .expect(201);
-
-    // 5. Verify the response
-    expect(response.body).toBeDefined();
-    expect(response.body.tokenBalance).toBe('10'); // Should be 10 TEST_TOKEN
-
-    // This should be 5 (GALA balance), but due to the bug it will be 10 (TEST_TOKEN balance)
-    // This assertion should fail because of the bug
-    expect(response.body.galaBalance).toBe('5');
-
-    // The giveaway wallet address should match
-    expect(response.body.giveawayWallet).toBe(profile.giveawayWalletAddress);
-  });
-
   it('should set paymentSent date when a payment is processed', async () => {
     // Setup: Create a giveaway creator with tokens
     const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =

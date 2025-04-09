@@ -284,9 +284,9 @@ export class GiveawayController {
         throw new BadRequestException(`Giveaway already claimed`);
       }
 
-      const gc_address = validateSignature(giveawayDto);
+      const eth_address = validateSignature(giveawayDto);
 
-      const profile = await this.profileService.findProfileByGC(gc_address);
+      const profile = await this.profileService.findProfileByEth(eth_address);
 
       if (claimableWin.gcAddress !== profile.galaChainAddress) {
         throw new BadRequestException(
@@ -336,66 +336,6 @@ export class GiveawayController {
         .status(HttpStatus.BAD_REQUEST)
         .json({ success: false, message: 'Failed to claim giveaway', error });
     }
-  }
-
-  @Post('tokens-available/:gcAddress')
-  async getTokensAvailable(
-    @Param('gcAddress') gcAddress: string,
-    @Body() tokenDto: TokensAvailableDto,
-  ) {
-    const userInfo = await this.profileService.findProfileByGC(gcAddress);
-
-    const allowances = await this.giveawayService.getNetAvailableTokenQuantity(
-      userInfo.giveawayWalletAddress,
-      userInfo._id as ObjectId,
-      tokenDto.tokenInstanceKey,
-      tokenDto.tokenType,
-    );
-
-    const availableTokens =
-      await this.giveawayService.getNetAvailableTokenQuantity(
-        userInfo.giveawayWalletAddress,
-        userInfo._id as ObjectId,
-        tokenDto.tokenInstanceKey,
-        tokenDto.tokenType,
-      );
-
-    const tokenBalances = await this.tokenService.getBalancesForToken(
-      userInfo.giveawayWalletAddress,
-      tokenDto.tokenInstanceKey,
-    );
-    const tokenBalance = tokenBalances.Data.reduce((total, item) => {
-      return total.plus(item.quantity);
-    }, new BigNumber(0));
-
-    const galaBalances = await this.tokenService.getBalancesForToken(
-      userInfo.giveawayWalletAddress,
-      GALA_TOKEN,
-    );
-
-    const requiredEscrow = await this.giveawayService.getRequiredEscrow(
-      userInfo.id,
-    );
-
-    //todo: account for locks
-    const galaBalance = galaBalances.Data.reduce((total, item) => {
-      return total.plus(item.quantity);
-    }, new BigNumber(0));
-
-    const galaNeededForOtherGiveaways =
-      await this.giveawayService.getTotalGalaFeesRequiredPlusEscrow(
-        userInfo.id,
-      );
-
-    return {
-      allowances,
-      tokenBalance,
-      galaBalance,
-      giveawayWallet: userInfo.giveawayWalletAddress,
-      galaNeededForOtherGiveaways,
-      availableTokens,
-      requiredEscrow,
-    } as const;
   }
 
   @Get('claimable-wins/:gcAddress')
@@ -448,50 +388,6 @@ export class GiveawayController {
         success: false,
         message: 'Failed to retrieve user wins',
         error,
-      });
-    }
-  }
-
-  @Post('required-gas/:gcAddress')
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  async getRequiredGas(
-    @Param('gcAddress') gcAddress: string,
-    @Body() giveawayDto: GiveawayDto,
-    @Res() res: Response,
-  ) {
-    try {
-      const account = await this.profileService.findProfileByGC(gcAddress);
-
-      if (!account) {
-        throw new NotFoundException(
-          `User with GC address ${gcAddress} not found`,
-        );
-      }
-
-      //For previous giveaways
-      const escrowGas =
-        await this.giveawayService.getTotalGalaFeesRequiredPlusEscrow(
-          account.id,
-        );
-
-      //For the new giveaway
-      const gasForGiveaway =
-        this.giveawayService.getRequiredGalaGasFeeForGiveaway(giveawayDto);
-
-      const requiredGas = escrowGas.plus(gasForGiveaway);
-
-      res.status(HttpStatus.OK).json({
-        success: true,
-        requiredGas: requiredGas.toString(),
-        escrowGas: escrowGas.toString(),
-        gasForGiveaway: gasForGiveaway.toString(),
-      });
-    } catch (error) {
-      console.error(error);
-      res.status(HttpStatus.BAD_REQUEST).json({
-        success: false,
-        message: 'Failed to calculate required gas fees',
-        error: error.message || error,
       });
     }
   }

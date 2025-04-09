@@ -223,15 +223,15 @@ export class ProfileController {
   async unlinkAccounts(@Body() unlinkDto: UnlinkDto) {
     try {
       // Validate the signature and get the GalaChain address
-      const gcAddress = validateSignature(unlinkDto);
-      if (!gcAddress) {
+      const ethAddress = validateSignature(unlinkDto);
+      if (!ethAddress) {
         throw new UnauthorizedException('Invalid signature');
       }
 
       // Find the profile by GalaChain address
-      const profile = await this.profileService.findProfileByGC(gcAddress);
+      const profile = await this.profileService.findProfileByEth(ethAddress);
       if (!profile) {
-        throw new NotFoundException(`Profile with GalaChain address ${gcAddress} not found`);
+        throw new NotFoundException(`Profile with GalaChain address ${ethAddress} not found`);
       }
 
       // Check if profile has Telegram data
@@ -263,37 +263,6 @@ export class ProfileController {
         { success: false, message: `Failed to unlink accounts: ${error.message}` },
         HttpStatus.INTERNAL_SERVER_ERROR
       );
-    }
-  }
-
-  @Get('giveaway-wallet-balances/:gcAddress')
-  async getAdminBalances(@Param('gcAddress') gcAddress: string) {
-    try {
-      const userInfo = await this.profileService.findProfileByGC(gcAddress);
-      const balances = await this.tokenService.fetchBalances(
-        userInfo.giveawayWalletAddress,
-      );
-      return balances;
-    } catch (error) {
-      console.error(error);
-      throw new BadRequestException(
-        `Failed to fetch balances, error: ${error}`,
-      );
-    }
-  }
-
-  @Get('giveaway-wallet-allowances/:gcAddress')
-  async getAdminAllowances(@Param('gcAddress') gcAddress: string) {
-    try {
-      const userInfo = await this.profileService.findProfileByGC(gcAddress);
-
-      const allowances = await this.tokenService.getAllowances(
-        userInfo.giveawayWalletAddress,
-      );
-      return allowances;
-    } catch (error) {
-      console.error(error);
-      throw new BadRequestException('Failed to fetch balances');
     }
   }
 
