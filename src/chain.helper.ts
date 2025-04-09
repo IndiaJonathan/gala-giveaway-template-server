@@ -10,13 +10,15 @@ import { TokenInstanceKeyDto } from './dtos/TokenInstanceKey.dto';
 import { BigNumber } from 'bignumber.js';
 
 export function checksumGCAddress(gcAddress: string) {
-  if (!gcAddress.startsWith('eth|')) {
+  if (!gcAddress.startsWith('eth|') && !gcAddress.startsWith('client|')) {
     throw new BadRequestException(
-      `GC address currently only supports eth|, but got: ${gcAddress}`,
+      `GC address currently only supports eth| or client|, but got: ${gcAddress}`,
     );
   }
-  const ethAddress = gcAddress.replace('eth|', '0x');
-  return getAddress(ethAddress).replace('0x', 'eth|');
+  
+  const prefix = gcAddress.startsWith('eth|') ? 'eth|' : 'client|';
+  const ethAddress = gcAddress.replace(prefix, '0x');
+  return getAddress(ethAddress).replace('0x', prefix);
 }
 
 export function checkTokenEquality(

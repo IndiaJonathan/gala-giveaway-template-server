@@ -69,7 +69,7 @@ export class ProfileService {
   async createProfile(ethAddress: string) {
     const registrationURL = await this.secrets['REGISTRATION_ENDPOINT'];
 
-    const galachainAlias = await this.galaChainApi.isRegistered(ethAddress);
+    const galachainAlias = await this.galaChainApi.getAlias(ethAddress);
     if (!galachainAlias.alias) {
       throw new UnauthorizedException('Must create a galachain account first');
     }
@@ -184,7 +184,7 @@ export class ProfileService {
     const client = new SigningClient(privateKey);
     const publicKey = await client.getPublicKey();
     try {
-      const profile = await this.galaChainApi.isRegistered(
+      const profile = await this.galaChainApi.getAlias(
         client.ethereumAddress,
       );
       if (profile.exists) {

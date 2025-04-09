@@ -32,9 +32,6 @@ export class GalachainApi implements OnModuleInit {
     this.adminSigner = new SigningClient(privateKey);
   }
   constructor(@Inject(APP_SECRETS) private secrets: Record<string, any>) {}
-  getGCAddress(address: string) {
-    return address.replace('0x', 'eth|');
-  }
 
   async fetchBalances(ownerAddress: string) {
     const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
@@ -119,7 +116,7 @@ export class GalachainApi implements OnModuleInit {
     return tokenApi.BatchMintToken(dto);
   }
 
-  async isRegistered(address: string) {
+  async getAlias(address: string) {
     const tokenApi = new TokenApi(this.tokenApiEndpoint, this.adminSigner);
     try {
       const isRegisteredResponse: any = await tokenApi.GetObjectByKey({

@@ -35,7 +35,7 @@ import {
   filterGiveawaysData,
   filterGiveawayData,
 } from '../utils/giveaway-utils';
-
+import { getAddress } from 'ethers';
 @Controller('api/giveaway')
 export class GiveawayController {
   constructor(
@@ -81,9 +81,9 @@ export class GiveawayController {
         }
       }
 
-      const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
+      const eth_address = getAddress(signatures.getEthAddress(publicKey));
 
-      const account = await this.profileService.findProfileByGC(gc_address);
+      const account = await this.profileService.findProfileByEth(eth_address);
 
       const availableTokens =
         await this.giveawayService.getNetAvailableTokenQuantity(
@@ -243,10 +243,12 @@ export class GiveawayController {
 
   @Post('fcfs/claim')
   async claimFCFS(@Body() giveawayDto: any) {
-    const gc_address = validateSignature(giveawayDto);
+    const eth_address = validateSignature(giveawayDto);
+    const profile = await this.profileService.findProfileByEth(eth_address);
+
     const winEntry = await this.giveawayService.claimFCFS(
       giveawayDto,
-      gc_address,
+      profile.galaChainAddress,
     );
 
     // Format the response to match the expected format in tests

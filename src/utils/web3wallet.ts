@@ -1,5 +1,5 @@
 import { signatures } from '@gala-chain/api';
-
+import { getAddress } from 'ethers';
 export function recoverAddressFromPublicKey(publicKey: string) {
   return signatures.getEthAddress(publicKey);
 }
@@ -20,7 +20,7 @@ export function recoverWalletAddressFromSignature(
   signedObject: object & { signature: string },
 ) {
   const publicKey = recoverPublicKeyFromSignature(signedObject);
-  return '0x' + recoverAddressFromPublicKey(publicKey);
+  return getAddress(recoverAddressFromPublicKey(publicKey));
 }
 
 export const removePrefixes = (prefixedString: string) => {
@@ -34,6 +34,6 @@ export function validateSignature<
   T extends { signature: string; prefix?: string },
 >(object: T) {
   const publicKey = recoverPublicKeyFromSignature(object);
-  const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
-  return gc_address;
+  const ethAddress = getAddress(signatures.getEthAddress(publicKey));
+  return ethAddress;
 }

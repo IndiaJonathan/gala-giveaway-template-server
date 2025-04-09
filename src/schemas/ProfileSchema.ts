@@ -27,10 +27,10 @@ export const ProfileSchema = new Schema<ProfileDocument>({
     unique: true,
     validate: {
       validator: function (value: string) {
-        return value.startsWith('eth|');
+        return value.startsWith('eth|') || value.startsWith('client|');
       },
       message: (props) =>
-        `${props.value} is invalid. The address must start with "eth|".`,
+        `${props.value} is invalid. The address must start with "eth|" or "client|".`,
     },
   },
   telegramId: {

@@ -39,6 +39,7 @@ import { GalachainApi } from '../web3-module/galachain.api';
 import { WalletService } from '../web3-module/wallet.service';
 import { GasFeeEstimateRequestDto } from '../dtos/GasFeeEstimateRequest.dto';
 import { filterGiveawayData } from '../utils/giveaway-utils';
+import { getAddress } from 'ethers';
 
 @Injectable()
 export class GiveawayService {
@@ -59,9 +60,9 @@ export class GiveawayService {
     tokenImage: string,
     burnTokenImage?: string,
   ): Promise<GiveawayDocument> {
-    const gc_address = 'eth|' + signatures.getEthAddress(publicKey);
+    const eth_address = getAddress(signatures.getEthAddress(publicKey));
 
-    const account = await this.profileService.findProfileByGC(gc_address);
+    const account = await this.profileService.findProfileByEth(eth_address);
 
     const newGiveaway = new this.giveawayModel({
       ...giveawayDto,
@@ -479,10 +480,9 @@ export class GiveawayService {
     claimDto: ClaimFCFSRequestDTO,
     gcAddress: string,
   ): Promise<any> {
-    gcAddress = checksumGCAddress(gcAddress);
-    if (!gcAddress.startsWith('eth|'))
+    if (!gcAddress.startsWith('eth|') && !gcAddress.startsWith('client|'))
       throw new BadRequestException(
-        'GC Address must start with eth|, any others are unsupported at the moment.',
+        'GC Address must start with eth| or client|, any others are unsupported at the moment.',
       );
     const giveaway = await this.giveawayModel
       .findById(claimDto.giveawayId)

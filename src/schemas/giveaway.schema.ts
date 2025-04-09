@@ -91,10 +91,10 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
     },
     validate: {
       validator: function (values: string[]) {
-        return values.every((value) => value.startsWith('eth|'));
+        return values.every((value) => value.startsWith('eth|') || value.startsWith('client|'));
       },
       message: (props) =>
-        `${props.value} is invalid. The address must start with "eth|".`,
+        `${props.value} is invalid. The address must start with "eth|" or "client|".`,
     },
     required: function (this: GiveawayDocument) {
       return this.giveawayType === 'DistributedGiveaway';

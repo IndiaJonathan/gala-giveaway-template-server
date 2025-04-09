@@ -36,7 +36,7 @@ export class ProfileController {
 
   @Get('info/isRegistered')
   async getIsRegistered(@Param('address') address) {
-    const isRegistered = this.galachainApi.isRegistered(address);
+    const isRegistered = this.galachainApi.getAlias(address);
     return isRegistered;
   }
 
