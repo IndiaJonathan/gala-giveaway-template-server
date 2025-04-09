@@ -156,10 +156,11 @@ export class ProfileController {
       );
     }
 
-    const gc_address = validateSignature(linkDto);
+    const eth_address = validateSignature(linkDto);
+    const profile = await this.profileService.findProfileByEth(eth_address);
 
     // Validate if the GalaChain address matches
-    if (gc_address !== linkDto['GalaChain Address']) {
+    if (profile.galaChainAddress !== linkDto['GalaChain Address']) {
       throw new UnauthorizedException(
         "GalaChain address and signature don't match",
       );
@@ -231,7 +232,7 @@ export class ProfileController {
       // Find the profile by GalaChain address
       const profile = await this.profileService.findProfileByEth(ethAddress);
       if (!profile) {
-        throw new NotFoundException(`Profile with GalaChain address ${ethAddress} not found`);
+        throw new NotFoundException(`Profile with eth address ${ethAddress} not found`);
       }
 
       // Check if profile has Telegram data
