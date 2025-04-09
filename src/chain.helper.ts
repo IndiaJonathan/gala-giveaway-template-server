@@ -9,18 +9,6 @@ import { TokenBalance } from '@gala-chain/connect';
 import { TokenInstanceKeyDto } from './dtos/TokenInstanceKey.dto';
 import { BigNumber } from 'bignumber.js';
 
-export function checksumGCAddress(gcAddress: string) {
-  if (!gcAddress.startsWith('eth|') && !gcAddress.startsWith('client|')) {
-    throw new BadRequestException(
-      `GC address currently only supports eth| or client|, but got: ${gcAddress}`,
-    );
-  }
-  
-  const prefix = gcAddress.startsWith('eth|') ? 'eth|' : 'client|';
-  const ethAddress = gcAddress.replace(prefix, '0x');
-  return getAddress(ethAddress).replace('0x', prefix);
-}
-
 export function checkTokenEquality(
   token1: TokenClassKey | TokenInstanceKeyDto | TokenClassKeyProperties,
   token2: TokenClassKey | TokenInstanceKeyDto | TokenClassKeyProperties,

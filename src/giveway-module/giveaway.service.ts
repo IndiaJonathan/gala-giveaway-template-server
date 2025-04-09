@@ -28,11 +28,7 @@ import {
   SigningClient,
 } from '@gala-chain/connect';
 import { ObjectId } from 'mongodb';
-import {
-  checksumGCAddress,
-  checkTokenEquality,
-  tokenToReadable,
-} from '../chain.helper';
+import { checkTokenEquality, tokenToReadable } from '../chain.helper';
 import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
 import { BurnTokenQuantityDto } from '../dtos/BurnTokenQuantity.dto';
 import { GalachainApi } from '../web3-module/galachain.api';
@@ -406,7 +402,7 @@ export class GiveawayService {
 
     if (giveaway.telegramAuthRequired) {
       const getProfile = await this.profileService.findProfileByGC(
-        checksumGCAddress(gcAddress),
+        gcAddress.toLowerCase(),
       );
       if (giveaway.telegramAuthRequired && !getProfile.telegramId) {
         throw new BadRequestException(
@@ -457,7 +453,7 @@ export class GiveawayService {
       throw new NotFoundException('Giveaway not found');
     }
 
-    if (giveaway.usersSignedUp.includes(checksumGCAddress(gcAddress))) {
+    if (giveaway.usersSignedUp.includes(gcAddress.toLowerCase())) {
       throw new BadRequestException(`You're already signed up!`);
     }
     if (giveaway.giveawayType !== 'DistributedGiveaway') {
@@ -502,7 +498,7 @@ export class GiveawayService {
     if (
       giveaway.winners.filter(
         (winner) =>
-          checksumGCAddress(winner.gcAddress) === checksumGCAddress(gcAddress),
+          winner.gcAddress.toLowerCase() === gcAddress.toLowerCase(),
       ).length
     ) {
       throw new BadRequestException(`You've already claimed this!`);
