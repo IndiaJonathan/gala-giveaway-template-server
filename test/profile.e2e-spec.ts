@@ -67,6 +67,10 @@ describe('Profile related functions', () => {
       } as unknown as ProfileDocument;
 
       jest
+        .spyOn(profileService, 'findProfileByEth')
+        .mockResolvedValue(mockProfile as any);
+
+      jest
         .spyOn(profileService, 'findProfileByGC')
         .mockResolvedValue(mockProfile as any);
 
@@ -111,10 +115,9 @@ describe('Profile related functions', () => {
         .mockImplementation(() => mockGcAddress);
 
       // Create a mock profile service with a testable implementation of checkTelegramAuthorization
-      const checkAuthSpy = jest.spyOn(
-        profileService,
-        'checkTelegramAuthorization',
-      ).mockImplementation((data, token) => true);
+      const checkAuthSpy = jest
+        .spyOn(profileService, 'checkTelegramAuthorization')
+        .mockImplementation((data, token) => true);
 
       // Test with camelCase property names
       const camelCaseData = {
