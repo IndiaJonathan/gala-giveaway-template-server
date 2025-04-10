@@ -13,7 +13,7 @@ import {
   Param,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { GiveawayTokenType, BasicGiveawaySettingsDto } from '../dtos/giveaway.dto';
+import { GiveawayTokenType, BasicGiveawaySettingsDto, GiveawayType } from '../dtos/giveaway.dto';
 import { GiveawayService } from './giveaway.service';
 import { signatures } from '@gala-chain/api';
 import { SignupGiveawayDto } from '../dtos/signup-giveaway.dto';
@@ -63,7 +63,7 @@ export class GiveawayController {
 
       // Validate that distributed giveaways have an end date
       if (
-        giveawayDto.giveawayType === 'DistributedGiveaway' &&
+        giveawayDto.giveawayType === GiveawayType.DistributedGiveaway &&
         !giveawayDto.endDateTime
       ) {
         throw new BadRequestException(
