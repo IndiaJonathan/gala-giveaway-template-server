@@ -9,12 +9,30 @@ import { TokenBalance } from '@gala-chain/connect';
 import { TokenInstanceKeyDto } from './dtos/TokenInstanceKey.dto';
 import { BigNumber } from 'bignumber.js';
 
+export function checksumGCAddress(gcAddress: string) {
+  if (!gcAddress.startsWith('eth|') && !gcAddress.startsWith('client|')) {
+    throw new BadRequestException(
+      `GC address currently only supports eth| or client|, but got: ${gcAddress}`,
+    );
+  }
+
+  const prefix = gcAddress.startsWith('eth|') ? 'eth|' : 'client|';
+  const ethAddress = gcAddress.replace(prefix, '0x');
+  if (prefix === 'eth|') {
+    return getAddress(ethAddress).replace('0x', prefix);
+  } else {
+    return ethAddress.replace('0x', prefix).toLowerCase();
+  }
+}
+
 export function checkTokenEquality(
   token1: TokenClassKey | TokenInstanceKeyDto | TokenClassKeyProperties,
   token2: TokenClassKey | TokenInstanceKeyDto | TokenClassKeyProperties,
 ) {
-  const instance1 = 'instance' in token1 ? new BigNumber(token1.instance) : new BigNumber(0);
-  const instance2 = 'instance' in token2 ? new BigNumber(token2.instance) : new BigNumber(0);
+  const instance1 =
+    'instance' in token1 ? new BigNumber(token1.instance) : new BigNumber(0);
+  const instance2 =
+    'instance' in token2 ? new BigNumber(token2.instance) : new BigNumber(0);
 
   return (
     token1.additionalKey === token2.additionalKey &&
