@@ -8,18 +8,35 @@ import {
   ValidateIf,
   IsNumber,
   IsEnum,
+  Matches,
 } from 'class-validator';
 import { NoBadWords } from '../validators/no-bad-words.validator';
+import { SignedPayloadBaseDto } from './SignedPayloadBase.dto';
 
 export enum GiveawayTokenType {
   BALANCE = 'Balance',
   ALLOWANCE = 'Allowance',
 }
+
+export enum GiveawayType {
+  FirstComeFirstServe = 'FirstComeFirstServe',
+  DistributedGiveaway = 'DistributedGiveaway',
+}
+
 // Base DTO for shared properties
-export class BasicGiveawaySettingsDto {
+export class BasicGiveawaySettingsDto extends SignedPayloadBaseDto {
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^giveaway-start.*/)
+  uniqueKey: string;
+
   @IsNotEmpty()
   @IsString()
   @NoBadWords({ message: 'Giveaway name contains inappropriate language' })
+  @Matches(/^[a-zA-Z0-9 ]+$/, {
+    message:
+      'Giveaway name must contain only alphanumeric characters and spaces',
+  })
   name: string;
 
   @IsNotEmpty()
@@ -65,7 +82,7 @@ export class BasicGiveawaySettingsDto {
   })
   burnToken?: any;
 
-  @IsNumber()
+  @IsNumberString()
   @IsNotEmpty()
   maxWinners: number;
 
@@ -74,28 +91,12 @@ export class BasicGiveawaySettingsDto {
     message: 'GiveawayTokenType must be one of: Balance, Allowance',
   })
   giveawayTokenType: GiveawayTokenType;
-}
 
-export class FirstComeFirstServeGiveawaySettingsDto extends BasicGiveawaySettingsDto {
   @IsNumberString()
   @IsNotEmpty()
   winPerUser?: string;
 
-  @IsString()
   @IsNotEmpty()
-  giveawayType: 'FirstComeFirstServe';
+  @IsEnum(GiveawayType, { message: 'giveawayType is required' })
+  giveawayType: GiveawayType;
 }
-
-export class RandomGiveawaySettingsDto extends BasicGiveawaySettingsDto {
-  @IsNotEmpty()
-  @IsNumberString()
-  winPerUser: string;
-
-  @IsNotEmpty()
-  @IsString()
-  giveawayType: 'DistributedGiveaway';
-}
-
-export type GiveawayDto =
-  | FirstComeFirstServeGiveawaySettingsDto
-  | RandomGiveawaySettingsDto;

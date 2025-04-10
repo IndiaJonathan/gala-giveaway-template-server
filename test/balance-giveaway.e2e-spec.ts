@@ -92,6 +92,7 @@ describe('Giveaway Controller (e2e)', () => {
     maxWinners: '1',
     winPerUser: '1',
     prefix: '\u0019Ethereum Signed Message:\n346',
+    uniqueKey: `giveaway-start-${new Date()}`,
   };
 
   const startBalanceGiveaway = {
@@ -133,8 +134,8 @@ describe('Giveaway Controller (e2e)', () => {
     const signer = new SigningClient(wallet.privateKey);
     const signedPayload = await signer.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      maxWinners: 10,
-      winPerUser: 5,
+      maxWinners: '10',
+      winPerUser: '5',
       giveawayToken: {
         additionalKey: 'none',
         category: 'Unit',
@@ -150,7 +151,7 @@ describe('Giveaway Controller (e2e)', () => {
       .expect(400)
       .expect((res) => {
         expect(res.body.success).toBe(false);
-        expect(res.body.message).toBe('Failed to start giveaway');
+        expect(res.body.message).toBe('Insuffucient GALA balance in Giveway wallet, need additional 0.5');
         expect(res.body.error.response.error).toBe('Bad Request');
         expect(res.body.error.response.message).toContain(
           'Insuffucient GALA balance in Giveway wallet',
@@ -254,7 +255,7 @@ describe('Giveaway Controller (e2e)', () => {
       .expect(400)
       .expect((res) => {
         expect(res.body.success).toBe(false);
-        expect(res.body.message).toBe('Failed to start giveaway');
+        expect(res.body.message).toBe('There must be at least 10 minutes between start and end date.');
         expect(res.body.error.response.message).toBe(
           'There must be at least 10 minutes between start and end date.'
         );
@@ -447,7 +448,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      winPerUser: 2,
+      winPerUser: '2',
     });
 
     await request(app.getHttpServer())
@@ -461,7 +462,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      winPerUser: 1,
+      winPerUser: '1',
     });
 
     await request(app.getHttpServer())
@@ -486,8 +487,8 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      winPerUser: 10,
-      maxWinners: 10,
+      winPerUser: '10',
+      maxWinners: '10',
     });
 
     await request(app.getHttpServer())
@@ -501,8 +502,8 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      winPerUser: 2,
-      maxWinners: 2,
+      winPerUser: '2',
+      maxWinners: '2',
     });
 
     await request(app.getHttpServer())
@@ -526,8 +527,8 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      winPerUser: 10,
-      maxWinners: 10,
+      winPerUser: '10',
+      maxWinners: '10',
     });
 
     await request(app.getHttpServer())
@@ -541,8 +542,8 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      winPerUser: 3,
-      maxWinners: 3,
+      winPerUser: '3',
+      maxWinners: '3',
     });
 
     await request(app.getHttpServer())
@@ -578,7 +579,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      winPerUser: 2,
+      winPerUser: '2',
     });
 
     await request(app.getHttpServer())
@@ -592,7 +593,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      winPerUser: 2,
+      winPerUser: '2',
       giveawayToken: { ...GALA_TOKEN, collection: 'GALA2' }, //electric boogaloo
     });
 
@@ -624,7 +625,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      winPerUser: 2,
+      winPerUser: '2',
     });
 
     await request(app.getHttpServer())
@@ -638,7 +639,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload2 = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startBalanceGiveaway,
-      winPerUser: 2,
+      winPerUser: '2',
       giveawayToken: { ...GALA_TOKEN, collection: 'GALA2' }, //electric boogaloo
     });
 
@@ -673,22 +674,11 @@ describe('Giveaway Controller (e2e)', () => {
       .set('Content-Type', 'application/json')
       .send(signedPayload)
       .expect(400)
-      .expect({
-        success: false,
-        message: 'Failed to start giveaway',
-        error: {
-          response: {
-            message:
-              'You need to transfer more tokens before you can start this giveaway. Need an additional 1',
-            error: 'Bad Request',
-            statusCode: 400,
-          },
-          status: 400,
-          options: {},
-          message:
-            'You need to transfer more tokens before you can start this giveaway. Need an additional 1',
-          name: 'BadRequestException',
-        },
+      .expect((res) => {
+        expect(res.body.success).toBe(false);
+        expect(res.body.message).toBe('You need to transfer more tokens before you can start this giveaway. Need an additional 1');
+        expect(res.body.error.response.error).toBe('Bad Request');
+        expect(res.body.error.status).toBe(400);
       });
   });
 
@@ -927,8 +917,8 @@ describe('Giveaway Controller (e2e)', () => {
     const secondFcfsGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'FirstComeFirstServe',
-      winPerUser: 1,
-      maxWinners: 1,
+      winPerUser: '1',
+      maxWinners: '1',
     };
 
     const signedSecondPayload = await giveawayCreatorSigner.sign(
@@ -1069,8 +1059,8 @@ describe('Giveaway Controller (e2e)', () => {
     const secondGiveaway = {
       ...startBalanceGiveaway,
       giveawayType: 'FirstComeFirstServe',
-      winPerUser: 1,
-      maxWinners: 1,
+      winPerUser: '1',
+      maxWinners: '1',
     };
 
     const signedSecondPayload = await giveawayCreator.signer.sign(
@@ -1469,8 +1459,7 @@ describe('Giveaway Controller (e2e)', () => {
   });
 
   it('should mark Win entry as claimed when claiming an FCFS giveaway', async () => {
-    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } =
-      await createUser();
+    const { profile: giveawayCreatorProfile, signer: giveawayCreatorSigner } = await createUser();
 
     // Grant tokens to the creator's giveaway wallet
     mockGalachainApi.grantBalanceForToken(
@@ -1498,7 +1487,11 @@ describe('Giveaway Controller (e2e)', () => {
       .post('/api/giveaway/start')
       .set('Content-Type', 'application/json')
       .send(signedPayload)
-      .expect(201);
+      .expect((res) => {
+        expect(res.body.success).toBe(true);
+        expect(res.body.giveaway).toBeDefined();
+        expect(res.body.giveaway._id).toBeDefined();
+      });
 
     expect(createRes.body.success).toBe(true);
     const giveawayId = createRes.body.giveaway._id;
@@ -1929,6 +1922,76 @@ describe('Giveaway Controller (e2e)', () => {
       // Should not be claimed yet as user needs to burn tokens
       expect(winEntries[0].claimed).toBeFalsy();
     }
+  });
+
+  it('should fail to create a distributed giveaway without an end date', async () => {
+    const wallet = await WalletUtils.createAndRegisterRandomWallet(
+      secrets['REGISTRATION_ENDPOINT'],
+    );
+
+    const profile = await profileService.createProfile(wallet.ethAddress);
+
+    mockGalachainApi.grantBalanceForToken(
+      profile.giveawayWalletAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    // Create a distributed giveaway without endDateTime
+    const distributedGiveawayWithoutEndDate = {
+      ...startBalanceGiveaway,
+      giveawayType: 'DistributedGiveaway',
+    };
+
+    delete distributedGiveawayWithoutEndDate.endDateTime;
+
+    const signer = new SigningClient(wallet.privateKey);
+    const signedPayload = await signer.sign('Start Giveaway', distributedGiveawayWithoutEndDate);
+
+    return await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.message).toContain(
+          'End date is required for distributed giveaways.'
+        );
+      });
+  });
+
+  it('should reject giveaways with non-alphanumeric characters in name', async () => {
+    const wallet = await WalletUtils.createAndRegisterRandomWallet(
+      secrets['REGISTRATION_ENDPOINT'],
+    );
+
+    const profile = await profileService.createProfile(wallet.ethAddress);
+
+    mockGalachainApi.grantBalanceForToken(
+      profile.giveawayWalletAddress,
+      GALA_TOKEN,
+      50,
+    );
+
+    // Create a giveaway with symbols in the name
+    const giveawayWithSymbolsInName = {
+      ...startBalanceGiveaway,
+      name: 'Test Giveaway !@#$%^&*()',
+    };
+
+    const signer = new SigningClient(wallet.privateKey);
+    const signedPayload = await signer.sign('Start Giveaway', giveawayWithSymbolsInName);
+
+    return await request(app.getHttpServer())
+      .post('/api/giveaway/start')
+      .set('Content-Type', 'application/json')
+      .send(signedPayload)
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.message).toContain(
+          'Giveaway name must contain only alphanumeric characters and spaces'
+        );
+      });
   });
 
   afterEach(async () => {

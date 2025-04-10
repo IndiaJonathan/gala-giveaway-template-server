@@ -92,6 +92,7 @@ describe('Giveaway Controller (e2e)', () => {
     maxWinners: '1',
     winPerUser: '1',
     prefix: '\u0019Ethereum Signed Message:\n346',
+    uniqueKey: `giveaway-start-${new Date()}`,
   };
 
   const startAllowanceGiveaway = {
@@ -116,22 +117,10 @@ describe('Giveaway Controller (e2e)', () => {
       .post('/api/giveaway/start')
       .set('Content-Type', 'application/json')
       .send(signedPayload)
-      .expect({
-        success: false,
-        message: 'Failed to start giveaway',
-        error: {
-          response: {
-            message:
-              'You need to grant more tokens before you can start this giveaway. Need an additional 1',
-            error: 'Bad Request',
-            statusCode: 400,
-          },
-          status: 400,
-          options: {},
-          message:
-            'You need to grant more tokens before you can start this giveaway. Need an additional 1',
-          name: 'BadRequestException',
-        },
+      .expect((res) => {
+        expect(res.body.message).toContain(
+          'You need to grant more tokens before you can start this giveaway. Need an additional 1',
+        );
       })
       .expect(400);
   });
@@ -166,21 +155,10 @@ describe('Giveaway Controller (e2e)', () => {
       .post('/api/giveaway/start')
       .set('Content-Type', 'application/json')
       .send(signedPayload)
-      .expect(400)
-      .expect({
-        success: false,
-        message: 'Failed to start giveaway',
-        error: {
-          response: {
-            message: 'The endDateTime must be at least one hour in the future.',
-            error: 'Bad Request',
-            statusCode: 400,
-          },
-          status: 400,
-          options: {},
-          message: 'The endDateTime must be at least one hour in the future.',
-          name: 'BadRequestException',
-        },
+      .expect((res) => {
+        expect(res.body.message).toContain(
+          'The endDateTime must be at least one hour in the future.',
+        );
       })
       .expect(400);
   });
@@ -214,22 +192,10 @@ describe('Giveaway Controller (e2e)', () => {
       .post('/api/giveaway/start')
       .set('Content-Type', 'application/json')
       .send(signedPayload)
-      .expect({
-        success: false,
-        message: 'Failed to start giveaway',
-        error: {
-          response: {
-            message:
-              'Insuffucient GALA balance in Giveway wallet, need additional 1',
-            error: 'Bad Request',
-            statusCode: 400,
-          },
-          status: 400,
-          options: {},
-          message:
-            'Insuffucient GALA balance in Giveway wallet, need additional 1',
-          name: 'BadRequestException',
-        },
+      .expect((res) => {
+        expect(res.body.message).toContain(
+          'Insuffucient GALA balance in Giveway wallet, need additional 1',
+        );
       })
       .expect(400);
   });
@@ -392,7 +358,7 @@ describe('Giveaway Controller (e2e)', () => {
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startAllowanceGiveaway,
-      winPerUser: 2,
+      winPerUser: '2',
     });
 
     await request(app.getHttpServer())
@@ -427,9 +393,13 @@ describe('Giveaway Controller (e2e)', () => {
 
     const currentTime = new Date();
     // Set startDateTime to be one hour in the future
-    const startDateTime = new Date(currentTime.getTime() + 60 * 60 * 1000).toISOString();
+    const startDateTime = new Date(
+      currentTime.getTime() + 60 * 60 * 1000,
+    ).toISOString();
     // Set endDateTime to be one hour and 5 minutes in the future (only 5 minutes after start)
-    const endDateTime = new Date(currentTime.getTime() + 65 * 60 * 1000).toISOString();
+    const endDateTime = new Date(
+      currentTime.getTime() + 65 * 60 * 1000,
+    ).toISOString();
 
     const signer = new SigningClient(wallet.privateKey);
     const signedPayload = await signer.sign('Start Giveaway', {
@@ -445,9 +415,8 @@ describe('Giveaway Controller (e2e)', () => {
       .expect(400)
       .expect((res) => {
         expect(res.body.success).toBe(false);
-        expect(res.body.message).toBe('Failed to start giveaway');
-        expect(res.body.error.response.message).toBe(
-          'There must be at least 10 minutes between start and end date.'
+        expect(res.body.message).toBe(
+          'There must be at least 10 minutes between start and end date.',
         );
       });
   });
@@ -477,7 +446,10 @@ describe('Giveaway Controller (e2e)', () => {
       ...startAllowanceGiveaway,
       // Explicitly omit startDateTime
     };
-    const signedPayload = await signer.sign('Start Giveaway', giveawayWithoutStartDate);
+    const signedPayload = await signer.sign(
+      'Start Giveaway',
+      giveawayWithoutStartDate,
+    );
 
     const response = await request(app.getHttpServer())
       .post('/api/giveaway/start')
@@ -488,7 +460,7 @@ describe('Giveaway Controller (e2e)', () => {
     // Verify the giveaway was created
     expect(response.body.success).toBe(true);
     expect(response.body.giveaway).toBeDefined();
-    
+
     // Verify startDateTime was set automatically
     const giveawayId = response.body.giveaway._id;
     const savedGiveaway = await giveawayModel.findById(giveawayId).exec();
@@ -514,9 +486,13 @@ describe('Giveaway Controller (e2e)', () => {
 
     // Set startDateTime to be 1 hour in the future
     const currentTime = new Date();
-    const startDateTime = new Date(currentTime.getTime() + 60 * 60 * 1000).toISOString();
+    const startDateTime = new Date(
+      currentTime.getTime() + 60 * 60 * 1000,
+    ).toISOString();
     // Set endDateTime to be 2 hours in the future
-    const endDateTime = new Date(currentTime.getTime() + 2 * 60 * 60 * 1000).toISOString();
+    const endDateTime = new Date(
+      currentTime.getTime() + 2 * 60 * 60 * 1000,
+    ).toISOString();
 
     const signedPayload = await giveawayCreatorSigner.sign('Start Giveaway', {
       ...startAllowanceGiveaway,
@@ -532,7 +508,7 @@ describe('Giveaway Controller (e2e)', () => {
       .expect(201);
 
     expect(res.body.success).toBe(true);
-    
+
     const { profile: giveawayUserProfile, signer: giveawayUserSigner } =
       await createUser();
 
@@ -551,7 +527,6 @@ describe('Giveaway Controller (e2e)', () => {
         expect(res.body.message).toBe('The giveaway has not started yet');
       });
   });
-
 
   afterEach(async () => {
     try {

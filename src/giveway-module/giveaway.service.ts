@@ -18,7 +18,7 @@ import {
 } from '@gala-chain/api';
 import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
-import { GiveawayDto, GiveawayTokenType } from '../dtos/giveaway.dto';
+import { GiveawayTokenType, BasicGiveawaySettingsDto } from '../dtos/giveaway.dto';
 import { GALA_TOKEN, MAX_ITERATIONS as MAX_WINNERS } from '../constant';
 import { WinDocument } from '../schemas/ClaimableWin.schema';
 import { APP_SECRETS } from '../secrets/secrets.module';
@@ -52,7 +52,7 @@ export class GiveawayService {
 
   async createGiveaway(
     publicKey: string,
-    giveawayDto: GiveawayDto,
+    giveawayDto: BasicGiveawaySettingsDto,
     tokenImage: string,
     burnTokenImage?: string,
   ): Promise<GiveawayDocument> {
@@ -616,7 +616,7 @@ export class GiveawayService {
     }
   }
 
-  getRequiredTokensForGiveaway(giveaway: GiveawayDocument | GiveawayDto) {
+  getRequiredTokensForGiveaway(giveaway: GiveawayDocument | BasicGiveawaySettingsDto) {
     switch (giveaway.giveawayType) {
       case 'FirstComeFirstServe':
         // For FCFS, we need to calculate based on remaining claims
@@ -676,7 +676,7 @@ export class GiveawayService {
   // }
 
   getRequiredGalaGasFeeForGiveaway(
-    giveawayDoc: GiveawayDto | GiveawayDocument | GasFeeEstimateRequestDto,
+    giveawayDoc: BasicGiveawaySettingsDto | GiveawayDocument | GasFeeEstimateRequestDto,
   ) {
     // Check if it's a fully claimed FCFS giveaway
     if (giveawayDoc.giveawayType === 'FirstComeFirstServe') {
@@ -699,7 +699,7 @@ export class GiveawayService {
 
   async getTotalGalaFeesRequiredPlusEscrow(
     ownerId: ObjectId,
-    giveaway?: GiveawayDocument | GiveawayDto,
+    giveaway?: GiveawayDocument | BasicGiveawaySettingsDto,
   ) {
     const unDistributedGiveaways = await this.findUndistributed(ownerId);
     let totalGalaFee = unDistributedGiveaways.reduce(

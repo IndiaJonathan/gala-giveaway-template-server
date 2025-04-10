@@ -13,7 +13,7 @@ import {
   Param,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { GiveawayDto, GiveawayTokenType } from '../dtos/giveaway.dto';
+import { GiveawayTokenType, BasicGiveawaySettingsDto } from '../dtos/giveaway.dto';
 import { GiveawayService } from './giveaway.service';
 import { signatures } from '@gala-chain/api';
 import { SignupGiveawayDto } from '../dtos/signup-giveaway.dto';
@@ -24,6 +24,7 @@ import { BurnTokensRequestDto } from '../dtos/ClaimWin.dto';
 import { ClaimFCFSRequestDTO } from '../dtos/ClaimFCFSGiveaway';
 import { ObjectId } from 'mongodb';
 import {
+  recoverPublicKeyFromSignature,
   recoverWalletAddressFromSignature,
   validateSignature,
 } from '../utils/web3wallet';
@@ -46,17 +47,28 @@ export class GiveawayController {
 
   @Post('start')
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
-  async startGiveaway(@Body() giveawayDto: GiveawayDto, @Res() res: Response) {
+  async startGiveaway(
+    @Body()
+    giveawayDto: BasicGiveawaySettingsDto,
+    @Res() res: Response,
+  ) {
     try {
-      const publicKey = signatures.recoverPublicKey(
-        giveawayDto.signature,
-        giveawayDto,
-        '',
-      );
+      // delete giveawayDto.types
+      const publicKey = recoverPublicKeyFromSignature(giveawayDto);
 
       // Set startDateTime to now if it's empty
       if (!giveawayDto.startDateTime) {
         giveawayDto.startDateTime = new Date().toISOString();
+      }
+
+      // Validate that distributed giveaways have an end date
+      if (
+        giveawayDto.giveawayType === 'DistributedGiveaway' &&
+        !giveawayDto.endDateTime
+      ) {
+        throw new BadRequestException(
+          'End date is required for distributed giveaways.',
+        );
       }
 
       if (giveawayDto.endDateTime) {
@@ -200,7 +212,7 @@ export class GiveawayController {
       console.error(error);
       res
         .status(HttpStatus.BAD_REQUEST)
-        .json({ success: false, message: 'Failed to start giveaway', error });
+        .json({ success: false, message: error.message || 'Failed to start giveaway', error });
     }
   }
 
