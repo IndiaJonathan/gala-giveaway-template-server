@@ -55,6 +55,14 @@ export class GalachainApi implements OnModuleInit {
     return tokenApi.BurnTokens(request);
   }
 
+  async getTokenInfo(tokenClassKey: TokenInstanceKeyDto, signer?: SigningClient) {
+    const tokenApi = new TokenApi(
+      this.tokenApiEndpoint,
+      undefined,
+    );
+    return tokenApi.FetchTokenClasses({ tokenClasses: [tokenClassKey] });
+  }
+
   async getBalancesForToken(
     ownerAddress: string,
     tokenClassKey: TokenInstanceKeyDto,

@@ -13,7 +13,11 @@ import {
   Param,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { GiveawayTokenType, BasicGiveawaySettingsDto, GiveawayType } from '../dtos/giveaway.dto';
+import {
+  GiveawayTokenType,
+  BasicGiveawaySettingsDto,
+  GiveawayType,
+} from '../dtos/giveaway.dto';
 import { GiveawayService } from './giveaway.service';
 import { signatures } from '@gala-chain/api';
 import { SignupGiveawayDto } from '../dtos/signup-giveaway.dto';
@@ -37,12 +41,15 @@ import {
   filterGiveawayData,
 } from '../utils/giveaway-utils';
 import { getAddress } from 'ethers';
+import { getNetAvailableTokenQuantity, getRequiredTokensForGiveaway } from './giveaway-logic.utils';
+import { WalletService } from '../web3-module/wallet.service';
 @Controller('api/giveaway')
 export class GiveawayController {
   constructor(
     private readonly giveawayService: GiveawayService,
     private tokenService: GalachainApi,
     private profileService: ProfileService,
+    private walletService: WalletService,
   ) {}
 
   @Post('start')
@@ -97,16 +104,35 @@ export class GiveawayController {
 
       const account = await this.profileService.findProfileByEth(eth_address);
 
-      const availableTokens =
-        await this.giveawayService.getNetAvailableTokenQuantity(
-          account.giveawayWalletAddress,
+      const unDistributedGiveaways =
+        await this.giveawayService.findUndistributed(
           account._id as ObjectId,
           giveawayDto.giveawayToken,
-          giveawayDto.giveawayTokenType,
         );
 
-      const tokensNeeded =
-        this.giveawayService.getRequiredTokensForGiveaway(giveawayDto);
+      let totalQuantity: BigNumber;
+      if (giveawayDto.giveawayTokenType === GiveawayTokenType.ALLOWANCE) {
+        totalQuantity = await this.walletService.getAllowanceQuantity(
+          account.giveawayWalletAddress,
+          giveawayDto.giveawayToken,
+        );
+      } else if (giveawayDto.giveawayTokenType === GiveawayTokenType.BALANCE) {
+        totalQuantity = await this.walletService.getBalanceQuantity(
+          account.giveawayWalletAddress,
+          giveawayDto.giveawayToken,
+        );
+      }
+
+      const availableTokens = getNetAvailableTokenQuantity(
+        account.giveawayWalletAddress,
+        account._id as ObjectId,
+        giveawayDto.giveawayToken,
+        giveawayDto.giveawayTokenType,
+        unDistributedGiveaways,
+        totalQuantity,
+      );
+
+      const tokensNeeded = getRequiredTokensForGiveaway(giveawayDto);
       const tokenDiff = BigNumber(availableTokens).minus(
         BigNumber(tokensNeeded),
       );
@@ -212,7 +238,11 @@ export class GiveawayController {
       console.error(error);
       res
         .status(HttpStatus.BAD_REQUEST)
-        .json({ success: false, message: error.message || 'Failed to start giveaway', error });
+        .json({
+          success: false,
+          message: error.message || 'Failed to start giveaway',
+          error,
+        });
     }
   }
 

@@ -41,6 +41,8 @@ export interface GiveawayDocument extends Document {
     instance: BigNumber;
   };
   giveawayTokenType: GiveawayTokenType;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const WinnerSchema = new Schema<Winner>({
@@ -134,4 +136,4 @@ export const GiveawaySchema = new Schema<GiveawayDocument>({
     required: true,
     enum: ['Balance', 'Allowance'],
   },
-});
+}, { timestamps: true });

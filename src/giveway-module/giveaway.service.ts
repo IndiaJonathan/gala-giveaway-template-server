@@ -18,7 +18,7 @@ import {
 } from '@gala-chain/api';
 import { ProfileService } from '../profile-module/profile.service';
 import BigNumber from 'bignumber.js';
-import { GiveawayTokenType, BasicGiveawaySettingsDto } from '../dtos/giveaway.dto';
+import { GiveawayTokenType, BasicGiveawaySettingsDto, GiveawayType } from '../dtos/giveaway.dto';
 import { GALA_TOKEN, MAX_ITERATIONS as MAX_WINNERS } from '../constant';
 import { WinDocument } from '../schemas/ClaimableWin.schema';
 import { APP_SECRETS } from '../secrets/secrets.module';
